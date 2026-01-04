@@ -1,20 +1,24 @@
 import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize2 } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
-import type { VideoProject } from '@/types/video';
+import type { VideoProject, AspectRatio } from '@/types/video';
+import { PLATFORM_CONFIGS } from '@/types/video';
 
 interface VideoPreviewProps {
   project: VideoProject;
+  onFormatChange?: (ratio: AspectRatio) => void;
 }
 
-export function VideoPreview({ project }: VideoPreviewProps) {
+export function VideoPreview({ project, onFormatChange }: VideoPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  const platformConfig = PLATFORM_CONFIGS[project.platform];
 
   useEffect(() => {
     const video = videoRef.current;
@@ -60,21 +64,51 @@ export function VideoPreview({ project }: VideoPreviewProps) {
     }
   };
 
+  const handleRestart = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      setCurrentTime(0);
+    }
+  };
+
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const getAspectRatioClass = () => {
+    switch (project.aspectRatio) {
+      case '9:16':
+        return 'aspect-[9/16] max-w-[320px]';
+      case '1:1':
+        return 'aspect-square max-w-[400px]';
+      case '4:5':
+        return 'aspect-[4/5] max-w-[360px]';
+      case '16:9':
+      default:
+        return 'aspect-video max-w-2xl';
+    }
+  };
+
   const isVertical = project.aspectRatio === '9:16';
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8">
-      {/* Phone frame for vertical content */}
+      {/* Platform indicator */}
+      <div className="mb-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-elevated/50 border border-border/30">
+        <span>{platformConfig.icon}</span>
+        <span className="text-sm text-muted-foreground">{platformConfig.name}</span>
+        <span className="text-xs text-muted-foreground/60">•</span>
+        <span className="text-sm text-foreground font-medium">{project.aspectRatio}</span>
+      </div>
+
+      {/* Video frame */}
       <div 
         className={cn(
-          "relative bg-surface rounded-3xl overflow-hidden",
-          isVertical ? "phone-frame max-w-[320px] aspect-[9/16]" : "w-full max-w-2xl aspect-video rounded-2xl border border-border"
+          "relative bg-surface rounded-3xl overflow-hidden w-full",
+          isVertical ? "phone-frame" : "border border-border",
+          getAspectRatioClass()
         )}
       >
         {/* Video */}
@@ -130,6 +164,14 @@ export function VideoPreview({ project }: VideoPreviewProps) {
                 <Button
                   variant="ghost"
                   size="icon"
+                  onClick={handleRestart}
+                  className="h-8 w-8 text-foreground hover:bg-foreground/10"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={toggleMute}
                   className="h-8 w-8 text-foreground hover:bg-foreground/10"
                 >
@@ -163,15 +205,26 @@ export function VideoPreview({ project }: VideoPreviewProps) {
             </div>
           </div>
         )}
+
+        {/* Exporting indicator */}
+        {project.status === 'exporting' && (
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <div className="w-12 h-12 rounded-full border-2 border-primary border-t-transparent animate-spin mx-auto" />
+              <p className="text-sm text-foreground font-medium">Exporting video...</p>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Format indicator */}
+      {/* Format switcher */}
       <div className="mt-6 flex items-center gap-3">
         <span className="text-xs text-muted-foreground">Format:</span>
         <div className="flex gap-2">
-          {['9:16', '1:1', '16:9'].map((ratio) => (
+          {platformConfig.aspectRatios.map((ratio) => (
             <button
               key={ratio}
+              onClick={() => onFormatChange?.(ratio as AspectRatio)}
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200",
                 project.aspectRatio === ratio
@@ -184,6 +237,13 @@ export function VideoPreview({ project }: VideoPreviewProps) {
           ))}
         </div>
       </div>
+
+      {/* Edit count */}
+      {project.edits.length > 0 && (
+        <div className="mt-4 text-xs text-muted-foreground">
+          {project.edits.filter(e => e.applied).length} edits applied
+        </div>
+      )}
     </div>
   );
 }
