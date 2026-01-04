@@ -104,9 +104,29 @@ export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
         )}
 
         {/* Title */}
-        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-10 text-center">
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6 text-center">
           What's your next video?
         </h1>
+
+        {/* Example Prompts */}
+        <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-3xl">
+          {[
+            "Cut long pauses",
+            "Remove filler words",
+            "Make it faster and more engaging",
+            "Generate rough cuts for Instagram",
+            "Trim to 30 seconds",
+            "Add animated captions"
+          ].map((example) => (
+            <button
+              key={example}
+              onClick={() => setPrompt(example)}
+              className="px-3 py-1.5 text-sm text-muted-foreground bg-card/30 border border-border/30 rounded-full hover:bg-card/50 hover:text-foreground hover:border-primary/40 transition-all duration-200"
+            >
+              {example}
+            </button>
+          ))}
+        </div>
 
         {/* Prompt box */}
         <div className="w-full max-w-2xl">
@@ -157,6 +177,13 @@ export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
                 Edit
               </Button>
             </div>
+          </div>
+
+          {/* Caption Features Hint */}
+          <div className="mt-6 p-4 rounded-xl bg-card/30 border border-border/20">
+            <p className="text-sm text-muted-foreground text-center">
+              <span className="text-primary">✨ Auto-captions</span> synced word-by-word • <span className="text-primary">Highlighted keywords</span> for emphasis • Modern animated styles • Brand colors & fonts
+            </p>
           </div>
 
           {/* Disclaimer */}
