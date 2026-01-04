@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { EditorWorkspace } from '@/components/EditorWorkspace';
-import type { VideoProject } from '@/types/video';
+import type { VideoProject, Platform, AspectRatio } from '@/types/video';
+import { PLATFORM_CONFIGS } from '@/types/video';
 
 // Sample video for demo purposes
 const SAMPLE_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
@@ -9,8 +10,9 @@ const SAMPLE_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket
 const Index = () => {
   const [project, setProject] = useState<VideoProject | null>(null);
 
-  const handleUpload = useCallback((file: File) => {
+  const handleUpload = useCallback((file: File, platform: Platform = 'instagram', initialPrompt?: string) => {
     const videoUrl = URL.createObjectURL(file);
+    const config = PLATFORM_CONFIGS[platform];
     
     const newProject: VideoProject = {
       id: Date.now().toString(),
@@ -19,22 +21,27 @@ const Index = () => {
       videoFile: file,
       createdAt: new Date(),
       duration: 0,
-      aspectRatio: '9:16', // Default to vertical for short-form
+      aspectRatio: config.aspectRatios[0] as AspectRatio,
+      platform,
       status: 'analyzing',
+      edits: [],
     };
 
     setProject(newProject);
   }, []);
 
-  const handleDemoMode = useCallback(() => {
+  const handleDemoMode = useCallback((platform: Platform = 'instagram') => {
+    const config = PLATFORM_CONFIGS[platform];
     const demoProject: VideoProject = {
       id: 'demo',
       title: 'My Talking Head Video',
       videoUrl: SAMPLE_VIDEO,
       createdAt: new Date(),
       duration: 15,
-      aspectRatio: '9:16',
+      aspectRatio: config.aspectRatios[0] as AspectRatio,
+      platform,
       status: 'analyzing',
+      edits: [],
     };
     setProject(demoProject);
   }, []);

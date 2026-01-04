@@ -1,17 +1,43 @@
 import { useState, useCallback, useRef } from 'react';
-import { Upload, Cloud, Scissors, MessageCircle } from 'lucide-react';
+import { Upload, Cloud, Scissors, MessageCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PlatformSelector } from '@/components/PlatformSelector';
 import { cn } from '@/lib/utils';
+import type { Platform } from '@/types/video';
+import { PLATFORM_CONFIGS } from '@/types/video';
 
 interface UploadZoneProps {
-  onUpload: (file: File) => void;
-  onDemo?: () => void;
+  onUpload: (file: File, platform: Platform, initialPrompt?: string) => void;
+  onDemo?: (platform: Platform) => void;
 }
+
+const EXAMPLE_PROMPTS = {
+  short: [
+    "Cut long pauses",
+    "Remove filler words",
+    "Make it faster and more engaging",
+    "Add animated captions",
+    "Trim to 30 seconds",
+    "Add trending music"
+  ],
+  long: [
+    "Create chapter markers",
+    "Remove awkward silences",
+    "Add professional captions",
+    "Optimize for engagement",
+    "Create highlight clips",
+    "Add intro and outro"
+  ]
+};
 
 export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
   const [prompt, setPrompt] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState<Platform>('instagram');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const platformConfig = PLATFORM_CONFIGS[selectedPlatform];
+  const isLongForm = platformConfig.contentType === 'long';
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -31,20 +57,22 @@ export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
     const videoFile = files.find(f => f.type.startsWith('video/'));
     
     if (videoFile) {
-      onUpload(videoFile);
+      onUpload(videoFile, selectedPlatform, prompt || undefined);
     }
-  }, [onUpload]);
+  }, [onUpload, selectedPlatform, prompt]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files[0]) {
-      onUpload(files[0]);
+      onUpload(files[0], selectedPlatform, prompt || undefined);
     }
-  }, [onUpload]);
+  }, [onUpload, selectedPlatform, prompt]);
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
+
+  const currentExamples = isLongForm ? EXAMPLE_PROMPTS.long : EXAMPLE_PROMPTS.short;
 
   return (
     <div 
@@ -74,7 +102,8 @@ export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
 
         {/* Center promo (optional) */}
         <div className="hidden md:flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">🎬 Edit videos with AI</span>
+          <Sparkles className="w-4 h-4 text-primary" />
+          <span className="text-muted-foreground">AI-powered video editing</span>
         </div>
 
         {/* Right side */}
@@ -99,25 +128,30 @@ export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
             <div className="text-center space-y-2">
               <Upload className="w-12 h-12 text-primary mx-auto" />
               <p className="text-lg font-medium text-foreground">Drop your video here</p>
+              <p className="text-sm text-muted-foreground">
+                Optimized for {platformConfig.name} • {platformConfig.aspectRatios[0]}
+              </p>
             </div>
           </div>
         )}
 
         {/* Title */}
-        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6 text-center">
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 text-center">
           What's your next video?
         </h1>
+        
+        <p className="text-muted-foreground text-center mb-6 max-w-lg">
+          Upload any video and edit it using natural language. Works for {isLongForm ? 'long-form' : 'short-form'} content.
+        </p>
+
+        {/* Platform Selector */}
+        <div className="mb-8">
+          <PlatformSelector selected={selectedPlatform} onSelect={setSelectedPlatform} />
+        </div>
 
         {/* Example Prompts */}
         <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-3xl">
-          {[
-            "Cut long pauses",
-            "Remove filler words",
-            "Make it faster and more engaging",
-            "Generate rough cuts for Instagram",
-            "Trim to 30 seconds",
-            "Add animated captions"
-          ].map((example) => (
+          {currentExamples.map((example) => (
             <button
               key={example}
               onClick={() => setPrompt(example)}
@@ -138,7 +172,9 @@ export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Ask CutAI to create minimalist captions that follow me as I speak"
+              placeholder={isLongForm 
+                ? "Create professional captions, add chapter markers, optimize for YouTube..." 
+                : "Remove filler words, add animated captions, make it viral..."}
               className="w-full min-h-[120px] p-5 bg-transparent text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none text-base leading-relaxed"
             />
 
@@ -167,15 +203,20 @@ export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
                 </Button>
               </div>
 
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={onDemo}
-                className="gap-2"
-              >
-                <Scissors className="w-4 h-4" />
-                Edit
-              </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground hidden sm:inline">
+                  {platformConfig.icon} {platformConfig.name} • {platformConfig.aspectRatios[0]}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => onDemo?.(selectedPlatform)}
+                  className="gap-2"
+                >
+                  <Scissors className="w-4 h-4" />
+                  Try Demo
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -184,6 +225,18 @@ export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
             <p className="text-sm text-muted-foreground text-center">
               <span className="text-primary">✨ Auto-captions</span> synced word-by-word • <span className="text-primary">Highlighted keywords</span> for emphasis • Modern animated styles • Brand colors & fonts
             </p>
+          </div>
+
+          {/* Platform-specific info */}
+          <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
+            <span>Max duration: {platformConfig.maxDuration >= 3600 
+              ? `${Math.floor(platformConfig.maxDuration / 3600)}h` 
+              : `${Math.floor(platformConfig.maxDuration / 60)}min`}
+            </span>
+            <span>•</span>
+            <span>Formats: {platformConfig.aspectRatios.join(', ')}</span>
+            <span>•</span>
+            <span>{isLongForm ? 'Long-form content' : 'Short-form content'}</span>
           </div>
 
           {/* Disclaimer */}
