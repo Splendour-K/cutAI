@@ -6,11 +6,12 @@ import { AnalyzingOverlay } from './AnalyzingOverlay';
 import { EditHistory } from './EditHistory';
 import { useVideoChat } from '@/hooks/useVideoChat';
 import { useVideoAnalysis } from '@/hooks/useVideoAnalysis';
-import type { VideoProject, EditAction, AspectRatio } from '@/types/video';
+import type { VideoProject, EditAction, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, History, Settings2, Brain, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 interface EditorWorkspaceProps {
   project: VideoProject;
@@ -21,7 +22,16 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const [project, setProject] = useState<VideoProject>(initialProject);
   const [isAnalyzing, setIsAnalyzing] = useState(true);
   const [activeTab, setActiveTab] = useState('chat');
-
+  const [captionSettings, setCaptionSettings] = useState<CaptionSettings>({
+    enabled: false,
+    style: 'modern',
+    position: 'bottom',
+    highlightKeywords: false,
+    fontFamily: 'Inter',
+    fontSize: 'medium',
+    textColor: 'hsl(210, 20%, 95%)',
+    brandColor: 'hsl(185, 85%, 50%)'
+  });
   const platformConfig = PLATFORM_CONFIGS[project.platform];
   const contentType = platformConfig.contentType;
 
@@ -60,6 +70,12 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     const editAction = await sendMessage(content);
     
     if (editAction) {
+      // Handle caption-related edits
+      if (editAction.type === 'caption') {
+        setCaptionSettings(prev => ({ ...prev, enabled: true }));
+        toast.success('Captions enabled');
+      }
+      
       setProject((prev) => ({ 
         ...prev, 
         status: 'ready',
@@ -352,6 +368,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
             project={project} 
             onFormatChange={handleFormatChange}
             analysis={analysis}
+            captionSettings={captionSettings}
+            onCaptionSettingsChange={setCaptionSettings}
           />
         </div>
       </div>
