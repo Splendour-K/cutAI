@@ -120,7 +120,7 @@ export type Database = {
           {
             foreignKeyName: "video_analysis_project_id_fkey"
             columns: ["project_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "video_projects"
             referencedColumns: ["id"]
           },
