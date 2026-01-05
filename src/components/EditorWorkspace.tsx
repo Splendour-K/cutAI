@@ -351,6 +351,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
           <VideoPreview 
             project={project} 
             onFormatChange={handleFormatChange}
+            analysis={analysis}
           />
         </div>
       </div>
