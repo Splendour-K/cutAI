@@ -91,6 +91,8 @@ export interface CaptionSettings {
   highlightKeywords: boolean;
   brandColor?: string;
   fontFamily?: string;
+  fontSize?: 'small' | 'medium' | 'large' | 'xlarge';
+  textColor?: string;
 }
 
 export interface ChatMessage {
