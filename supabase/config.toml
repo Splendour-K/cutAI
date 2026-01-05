@@ -2,3 +2,6 @@ project_id = "bkhdorwhekifuapiisxk"
 
 [functions.analyze-video]
 verify_jwt = false
+
+[functions.video-chat]
+verify_jwt = false
