@@ -22,25 +22,33 @@ interface VideoPreviewProps {
   project: VideoProject;
   onFormatChange?: (ratio: AspectRatio) => void;
   analysis?: VideoAnalysis | null;
+  captionSettings?: CaptionSettings;
+  onCaptionSettingsChange?: (settings: CaptionSettings) => void;
 }
 
-export function VideoPreview({ project, onFormatChange, analysis }: VideoPreviewProps) {
+const defaultCaptionSettings: CaptionSettings = {
+  enabled: false,
+  style: 'modern',
+  position: 'bottom',
+  highlightKeywords: false,
+  fontFamily: 'Inter',
+  fontSize: 'medium',
+  textColor: 'hsl(210, 20%, 95%)',
+  brandColor: 'hsl(185, 85%, 50%)'
+};
+
+export function VideoPreview({ project, onFormatChange, analysis, captionSettings: externalCaptionSettings, onCaptionSettingsChange }: VideoPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [captionSettings, setCaptionSettings] = useState<CaptionSettings>({
-    enabled: true,
-    style: 'modern',
-    position: 'bottom',
-    highlightKeywords: false,
-    fontFamily: 'Inter',
-    fontSize: 'medium',
-    textColor: 'hsl(210, 20%, 95%)',
-    brandColor: 'hsl(185, 85%, 50%)'
-  });
+  const [internalCaptionSettings, setInternalCaptionSettings] = useState<CaptionSettings>(defaultCaptionSettings);
   const [editedCaptions, setEditedCaptions] = useState<Record<number, string>>({});
+
+  // Use external settings if provided, otherwise use internal
+  const captionSettings = externalCaptionSettings ?? internalCaptionSettings;
+  const setCaptionSettings = onCaptionSettingsChange ?? setInternalCaptionSettings;
 
   const handleEditCaption = useCallback((index: number, text: string) => {
     setEditedCaptions(prev => ({ ...prev, [index]: text }));
