@@ -1,17 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
+import { VideoTimeline } from './VideoTimeline';
 import { cn } from '@/lib/utils';
 import type { VideoProject, AspectRatio } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
+import type { VideoAnalysis } from '@/hooks/useVideoAnalysis';
 
 interface VideoPreviewProps {
   project: VideoProject;
   onFormatChange?: (ratio: AspectRatio) => void;
+  analysis?: VideoAnalysis | null;
 }
 
-export function VideoPreview({ project, onFormatChange }: VideoPreviewProps) {
+export function VideoPreview({ project, onFormatChange, analysis }: VideoPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -57,10 +59,10 @@ export function VideoPreview({ project, onFormatChange }: VideoPreviewProps) {
     }
   };
 
-  const handleSeek = (value: number[]) => {
+  const handleSeek = (time: number) => {
     if (videoRef.current) {
-      videoRef.current.currentTime = value[0];
-      setCurrentTime(value[0]);
+      videoRef.current.currentTime = time;
+      setCurrentTime(time);
     }
   };
 
@@ -92,6 +94,7 @@ export function VideoPreview({ project, onFormatChange }: VideoPreviewProps) {
   };
 
   const isVertical = project.aspectRatio === '9:16';
+  const hasAnalysis = analysis?.status === 'completed';
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8">
@@ -137,14 +140,21 @@ export function VideoPreview({ project, onFormatChange }: VideoPreviewProps) {
 
           {/* Bottom controls */}
           <div className="absolute bottom-0 left-0 right-0 p-4 space-y-3">
-            {/* Progress bar */}
-            <Slider
-              value={[currentTime]}
-              max={duration || 100}
-              step={0.1}
-              onValueChange={handleSeek}
-              className="cursor-pointer"
-            />
+            {/* Simple progress bar for overlay */}
+            <div 
+              className="h-1 bg-foreground/20 rounded-full cursor-pointer"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const percent = x / rect.width;
+                handleSeek(percent * duration);
+              }}
+            >
+              <div 
+                className="h-full bg-primary rounded-full transition-all"
+                style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+              />
+            </div>
 
             {/* Control buttons */}
             <div className="flex items-center justify-between">
@@ -216,6 +226,20 @@ export function VideoPreview({ project, onFormatChange }: VideoPreviewProps) {
           </div>
         )}
       </div>
+
+      {/* Timeline with analysis markers */}
+      {duration > 0 && (
+        <div className="w-full max-w-2xl mt-6">
+          <VideoTimeline
+            duration={duration}
+            currentTime={currentTime}
+            pauses={hasAnalysis ? analysis?.pauses : null}
+            keyMoments={hasAnalysis ? analysis?.keyMoments : null}
+            sceneChanges={hasAnalysis ? analysis?.sceneChanges : null}
+            onSeek={handleSeek}
+          />
+        </div>
+      )}
 
       {/* Format switcher */}
       <div className="mt-6 flex items-center gap-3">

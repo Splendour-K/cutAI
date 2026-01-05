@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { Upload, Cloud, Scissors, MessageCircle, Sparkles } from 'lucide-react';
+import { Upload, Cloud, Scissors, MessageCircle, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlatformSelector } from '@/components/PlatformSelector';
 import { cn } from '@/lib/utils';
@@ -9,6 +9,8 @@ import { PLATFORM_CONFIGS } from '@/types/video';
 interface UploadZoneProps {
   onUpload: (file: File, platform: Platform, initialPrompt?: string) => void;
   onDemo?: (platform: Platform) => void;
+  isUploading?: boolean;
+  uploadProgress?: number;
 }
 
 const EXAMPLE_PROMPTS = {
@@ -30,7 +32,7 @@ const EXAMPLE_PROMPTS = {
   ]
 };
 
-export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
+export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: UploadZoneProps) {
   const [prompt, setPrompt] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('instagram');
@@ -188,15 +190,26 @@ export function UploadZone({ onUpload, onDemo }: UploadZoneProps) {
                   variant="secondary"
                   size="sm"
                   onClick={handleUploadClick}
+                  disabled={isUploading}
                   className="gap-2"
                 >
-                  <Upload className="w-4 h-4" />
-                  Upload
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      {uploadProgress ? `${uploadProgress}%` : 'Uploading...'}
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Upload
+                    </>
+                  )}
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
                   className="gap-2"
+                  disabled={isUploading}
                 >
                   <Cloud className="w-4 h-4" />
                   Drive

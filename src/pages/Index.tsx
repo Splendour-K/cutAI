@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { EditorWorkspace } from '@/components/EditorWorkspace';
+import { useVideoUpload } from '@/hooks/useVideoUpload';
 import type { VideoProject, Platform, AspectRatio } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 
@@ -9,15 +10,22 @@ const SAMPLE_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket
 
 const Index = () => {
   const [project, setProject] = useState<VideoProject | null>(null);
+  const { uploadVideo, isUploading, uploadProgress } = useVideoUpload();
 
-  const handleUpload = useCallback((file: File, platform: Platform = 'instagram', initialPrompt?: string) => {
-    const videoUrl = URL.createObjectURL(file);
+  const handleUpload = useCallback(async (file: File, platform: Platform = 'instagram', initialPrompt?: string) => {
     const config = PLATFORM_CONFIGS[platform];
     
+    // Upload to storage (or create local URL for unauthenticated users)
+    const result = await uploadVideo(file, platform);
+    
+    if (!result) {
+      return; // Upload failed, error already shown
+    }
+    
     const newProject: VideoProject = {
-      id: Date.now().toString(),
-      title: file.name.replace(/\.[^/.]+$/, ''),
-      videoUrl,
+      id: result.projectId,
+      title: result.fileName.replace(/\.[^/.]+$/, ''),
+      videoUrl: result.videoUrl,
       videoFile: file,
       createdAt: new Date(),
       duration: 0,
@@ -28,7 +36,7 @@ const Index = () => {
     };
 
     setProject(newProject);
-  }, []);
+  }, [uploadVideo]);
 
   const handleDemoMode = useCallback((platform: Platform = 'instagram') => {
     const config = PLATFORM_CONFIGS[platform];
@@ -47,7 +55,7 @@ const Index = () => {
   }, []);
 
   const handleBack = useCallback(() => {
-    if (project?.videoUrl && project.videoUrl !== SAMPLE_VIDEO) {
+    if (project?.videoUrl && project.videoUrl !== SAMPLE_VIDEO && project.videoUrl.startsWith('blob:')) {
       URL.revokeObjectURL(project.videoUrl);
     }
     setProject(null);
@@ -57,7 +65,7 @@ const Index = () => {
     return <EditorWorkspace project={project} onBack={handleBack} />;
   }
 
-  return <UploadZone onUpload={handleUpload} onDemo={handleDemoMode} />
+  return <UploadZone onUpload={handleUpload} onDemo={handleDemoMode} isUploading={isUploading} uploadProgress={uploadProgress} />
 };
 
 export default Index;
