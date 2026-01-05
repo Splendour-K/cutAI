@@ -14,7 +14,174 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      edit_history: {
+        Row: {
+          applied_at: string
+          description: string
+          edit_type: string
+          id: string
+          parameters: Json | null
+          project_id: string
+        }
+        Insert: {
+          applied_at?: string
+          description: string
+          edit_type: string
+          id?: string
+          parameters?: Json | null
+          project_id: string
+        }
+        Update: {
+          applied_at?: string
+          description?: string
+          edit_type?: string
+          id?: string
+          parameters?: Json | null
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "edit_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      video_analysis: {
+        Row: {
+          analysis_status: string
+          created_at: string
+          error_message: string | null
+          id: string
+          key_moments: Json | null
+          pauses: Json | null
+          project_id: string
+          scene_changes: Json | null
+          suggested_edits: Json | null
+          transcription: Json | null
+          updated_at: string
+        }
+        Insert: {
+          analysis_status?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          key_moments?: Json | null
+          pauses?: Json | null
+          project_id: string
+          scene_changes?: Json | null
+          suggested_edits?: Json | null
+          transcription?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          analysis_status?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          key_moments?: Json | null
+          pauses?: Json | null
+          project_id?: string
+          scene_changes?: Json | null
+          suggested_edits?: Json | null
+          transcription?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_analysis_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_projects: {
+        Row: {
+          aspect_ratio: string
+          content_type: string
+          created_at: string
+          description: string | null
+          duration_seconds: number | null
+          id: string
+          platform: string
+          status: string
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          video_url: string | null
+        }
+        Insert: {
+          aspect_ratio?: string
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          platform?: string
+          status?: string
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+          video_url?: string | null
+        }
+        Update: {
+          aspect_ratio?: string
+          content_type?: string
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          platform?: string
+          status?: string
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_projects_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
