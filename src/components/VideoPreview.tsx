@@ -1,11 +1,22 @@
-import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, Captions, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VideoTimeline } from './VideoTimeline';
+import { CaptionOverlay } from './CaptionOverlay';
+import { CaptionEditor } from './CaptionEditor';
+import { CaptionSettingsPanel } from './CaptionSettingsPanel';
 import { cn } from '@/lib/utils';
-import type { VideoProject, AspectRatio } from '@/types/video';
+import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import type { VideoAnalysis } from '@/hooks/useVideoAnalysis';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface VideoPreviewProps {
   project: VideoProject;
@@ -19,6 +30,21 @@ export function VideoPreview({ project, onFormatChange, analysis }: VideoPreview
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [captionSettings, setCaptionSettings] = useState<CaptionSettings>({
+    enabled: true,
+    style: 'modern',
+    position: 'bottom',
+    highlightKeywords: false,
+    fontFamily: 'Inter',
+    fontSize: 'medium',
+    textColor: 'hsl(210, 20%, 95%)',
+    brandColor: 'hsl(185, 85%, 50%)'
+  });
+  const [editedCaptions, setEditedCaptions] = useState<Record<number, string>>({});
+
+  const handleEditCaption = useCallback((index: number, text: string) => {
+    setEditedCaptions(prev => ({ ...prev, [index]: text }));
+  }, []);
 
   const platformConfig = PLATFORM_CONFIGS[project.platform];
 
@@ -122,6 +148,16 @@ export function VideoPreview({ project, onFormatChange, analysis }: VideoPreview
           playsInline
         />
 
+        {/* Caption Overlay */}
+        {hasAnalysis && analysis?.transcription && (
+          <CaptionOverlay
+            currentTime={currentTime}
+            segments={analysis.transcription.segments}
+            settings={captionSettings}
+            editedCaptions={editedCaptions}
+          />
+        )}
+
         {/* Overlay controls */}
         <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300">
           {/* Center play button */}
@@ -195,13 +231,28 @@ export function VideoPreview({ project, onFormatChange, analysis }: VideoPreview
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-foreground hover:bg-foreground/10"
-              >
-                <Maximize2 className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {/* Caption toggle button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setCaptionSettings(prev => ({ ...prev, enabled: !prev.enabled }))}
+                  className={cn(
+                    "h-8 w-8 hover:bg-foreground/10",
+                    captionSettings.enabled ? "text-primary" : "text-foreground"
+                  )}
+                  title={captionSettings.enabled ? "Hide captions" : "Show captions"}
+                >
+                  <Captions className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-foreground hover:bg-foreground/10"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -241,24 +292,65 @@ export function VideoPreview({ project, onFormatChange, analysis }: VideoPreview
         </div>
       )}
 
-      {/* Format switcher */}
-      <div className="mt-6 flex items-center gap-3">
-        <span className="text-xs text-muted-foreground">Format:</span>
-        <div className="flex gap-2">
-          {platformConfig.aspectRatios.map((ratio) => (
-            <button
-              key={ratio}
-              onClick={() => onFormatChange?.(ratio as AspectRatio)}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200",
-                project.aspectRatio === ratio
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-surface-elevated text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {ratio}
-            </button>
-          ))}
+      {/* Caption & Format Controls */}
+      <div className="mt-6 flex items-center gap-4">
+        {/* Caption Settings Sheet */}
+        {hasAnalysis && analysis?.transcription && (
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Settings2 className="w-4 h-4" />
+                Caption Settings
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[400px] sm:w-[540px]">
+              <SheetHeader>
+                <SheetTitle>Caption Settings</SheetTitle>
+              </SheetHeader>
+              <Tabs defaultValue="settings" className="mt-4">
+                <TabsList className="w-full">
+                  <TabsTrigger value="settings" className="flex-1">Style</TabsTrigger>
+                  <TabsTrigger value="editor" className="flex-1">Edit Text</TabsTrigger>
+                </TabsList>
+                <TabsContent value="settings" className="mt-4">
+                  <CaptionSettingsPanel
+                    settings={captionSettings}
+                    onSettingsChange={setCaptionSettings}
+                  />
+                </TabsContent>
+                <TabsContent value="editor" className="mt-4 h-[calc(100vh-200px)]">
+                  <CaptionEditor
+                    segments={analysis.transcription.segments}
+                    currentTime={currentTime}
+                    editedCaptions={editedCaptions}
+                    onEditCaption={handleEditCaption}
+                    onSeek={handleSeek}
+                  />
+                </TabsContent>
+              </Tabs>
+            </SheetContent>
+          </Sheet>
+        )}
+
+        {/* Format switcher */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">Format:</span>
+          <div className="flex gap-2">
+            {platformConfig.aspectRatios.map((ratio) => (
+              <button
+                key={ratio}
+                onClick={() => onFormatChange?.(ratio as AspectRatio)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200",
+                  project.aspectRatio === ratio
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-surface-elevated text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {ratio}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
