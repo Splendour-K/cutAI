@@ -102,7 +102,9 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     if (!project.id) return;
     
     try {
-      await generateCaptions(project.id, project.videoFile, project.videoUrl);
+      // Skip persistence for demo/blob URLs (not stored in database)
+      const skipPersistence = project.videoUrl?.startsWith('blob:') ?? false;
+      await generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
       setCaptionSettings(prev => ({ ...prev, enabled: true }));
       toast.success('Captions are now enabled');
     } catch (error) {
