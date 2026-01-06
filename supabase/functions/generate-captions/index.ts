@@ -11,6 +11,7 @@ interface CaptionRequest {
   videoUrl?: string;
   videoBase64?: string;
   mimeType?: string;
+  skipPersistence?: boolean;
 }
 
 interface TranscriptSegment {
@@ -35,25 +36,38 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { projectId, videoUrl, videoBase64, mimeType = 'video/mp4' }: CaptionRequest = await req.json();
+    const { projectId, videoUrl, videoBase64, mimeType = 'video/mp4', skipPersistence = false }: CaptionRequest = await req.json();
 
     if (!projectId) {
       throw new Error("Project ID is required");
     }
 
-    console.log(`Starting caption generation for project: ${projectId}`);
+    console.log(`Starting caption generation for project: ${projectId}, skipPersistence: ${skipPersistence}`);
 
-    // Update analysis status to processing
-    const { error: updateError } = await supabase
-      .from('video_analysis')
-      .upsert({
-        project_id: projectId,
-        analysis_status: 'processing',
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'project_id' });
+    // Only update database if project exists (not a demo/temporary project)
+    if (!skipPersistence) {
+      // Check if project exists first
+      const { data: projectExists } = await supabase
+        .from('video_projects')
+        .select('id')
+        .eq('id', projectId)
+        .single();
 
-    if (updateError) {
-      console.error("Error updating analysis status:", updateError);
+      if (projectExists) {
+        const { error: updateError } = await supabase
+          .from('video_analysis')
+          .upsert({
+            project_id: projectId,
+            analysis_status: 'processing',
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'project_id' });
+
+        if (updateError) {
+          console.error("Error updating analysis status:", updateError);
+        }
+      } else {
+        console.log("Project not found in database, skipping persistence");
+      }
     }
 
     // Prepare the video content for Gemini
@@ -194,23 +208,35 @@ Guidelines:
       throw new Error("Failed to parse transcription results");
     }
 
-    // Store the transcription results
-    const { error: saveError } = await supabase
-      .from('video_analysis')
-      .upsert({
-        project_id: projectId,
-        transcription: transcriptionResult.transcription,
-        analysis_status: 'completed',
-        error_message: null,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'project_id' });
+    // Store the transcription results only if not skipping persistence
+    if (!skipPersistence) {
+      const { data: projectExists } = await supabase
+        .from('video_projects')
+        .select('id')
+        .eq('id', projectId)
+        .single();
 
-    if (saveError) {
-      console.error("Error saving transcription:", saveError);
-      throw new Error("Failed to save transcription results");
+      if (projectExists) {
+        const { error: saveError } = await supabase
+          .from('video_analysis')
+          .upsert({
+            project_id: projectId,
+            transcription: transcriptionResult.transcription,
+            analysis_status: 'completed',
+            error_message: null,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'project_id' });
+
+        if (saveError) {
+          console.error("Error saving transcription:", saveError);
+          // Don't throw - still return results to user
+        } else {
+          console.log("Caption generation completed and saved successfully");
+        }
+      }
     }
 
-    console.log("Caption generation completed and saved successfully");
+    console.log("Caption generation completed");
 
     return new Response(JSON.stringify({
       success: true,

@@ -144,7 +144,8 @@ export function useVideoAnalysis() {
   const generateCaptions = useCallback(async (
     projectId: string,
     videoFile?: File,
-    videoUrl?: string
+    videoUrl?: string,
+    skipPersistence = false
   ) => {
     setIsGeneratingCaptions(true);
     
@@ -162,8 +163,9 @@ export function useVideoAnalysis() {
     });
 
     try {
-      let requestBody: { projectId: string; videoUrl?: string; videoBase64?: string; mimeType?: string } = {
-        projectId
+      let requestBody: { projectId: string; videoUrl?: string; videoBase64?: string; mimeType?: string; skipPersistence?: boolean } = {
+        projectId,
+        skipPersistence
       };
 
       if (videoFile) {
