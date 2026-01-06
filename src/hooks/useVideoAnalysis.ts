@@ -58,6 +58,7 @@ export interface VideoAnalysis {
 
 export function useVideoAnalysis() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingCaptions, setIsGeneratingCaptions] = useState(false);
   const [analysis, setAnalysis] = useState<VideoAnalysis | null>(null);
 
   const analyzeVideo = useCallback(async (
@@ -140,6 +141,87 @@ export function useVideoAnalysis() {
     }
   }, []);
 
+  const generateCaptions = useCallback(async (
+    projectId: string,
+    videoFile?: File,
+    videoUrl?: string
+  ) => {
+    setIsGeneratingCaptions(true);
+    
+    // Set processing state but preserve existing analysis data
+    setAnalysis(prev => prev ? {
+      ...prev,
+      status: 'processing'
+    } : {
+      transcription: null,
+      pauses: null,
+      keyMoments: null,
+      sceneChanges: null,
+      suggestedEdits: null,
+      status: 'processing'
+    });
+
+    try {
+      let requestBody: { projectId: string; videoUrl?: string; videoBase64?: string; mimeType?: string } = {
+        projectId
+      };
+
+      if (videoFile) {
+        const base64 = await fileToBase64(videoFile);
+        requestBody.videoBase64 = base64;
+        requestBody.mimeType = videoFile.type;
+      } else if (videoUrl) {
+        requestBody.videoUrl = videoUrl;
+      } else {
+        throw new Error("Either a video file or URL is required");
+      }
+
+      const { data, error } = await supabase.functions.invoke('generate-captions', {
+        body: requestBody
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const transcription = data.transcription;
+      setAnalysis(prev => ({
+        ...prev!,
+        transcription,
+        status: 'completed'
+      }));
+
+      toast.success('Captions generated!');
+      return transcription;
+
+    } catch (error) {
+      console.error('Caption generation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Caption generation failed';
+      
+      setAnalysis(prev => ({
+        ...prev!,
+        status: 'error',
+        errorMessage
+      }));
+
+      if (errorMessage.includes('Rate limit')) {
+        toast.error('Rate limit exceeded. Please try again in a moment.');
+      } else if (errorMessage.includes('credits')) {
+        toast.error('AI credits exhausted. Please add more credits.');
+      } else {
+        toast.error(`Caption generation failed: ${errorMessage}`);
+      }
+      
+      throw error;
+    } finally {
+      setIsGeneratingCaptions(false);
+    }
+  }, []);
+
   const fetchAnalysis = useCallback(async (projectId: string) => {
     try {
       const { data, error } = await supabase
@@ -171,8 +253,10 @@ export function useVideoAnalysis() {
 
   return {
     isAnalyzing,
+    isGeneratingCaptions,
     analysis,
     analyzeVideo,
+    generateCaptions,
     fetchAnalysis,
     setAnalysis
   };

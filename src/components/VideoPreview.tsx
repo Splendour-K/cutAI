@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, Captions, Settings2 } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, Captions, Settings2, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VideoTimeline } from './VideoTimeline';
 import { CaptionOverlay } from './CaptionOverlay';
@@ -24,6 +24,8 @@ interface VideoPreviewProps {
   analysis?: VideoAnalysis | null;
   captionSettings?: CaptionSettings;
   onCaptionSettingsChange?: (settings: CaptionSettings) => void;
+  onGenerateCaptions?: () => void;
+  isGeneratingCaptions?: boolean;
 }
 
 const defaultCaptionSettings: CaptionSettings = {
@@ -37,7 +39,15 @@ const defaultCaptionSettings: CaptionSettings = {
   brandColor: 'hsl(185, 85%, 50%)'
 };
 
-export function VideoPreview({ project, onFormatChange, analysis, captionSettings: externalCaptionSettings, onCaptionSettingsChange }: VideoPreviewProps) {
+export function VideoPreview({ 
+  project, 
+  onFormatChange, 
+  analysis, 
+  captionSettings: externalCaptionSettings, 
+  onCaptionSettingsChange,
+  onGenerateCaptions,
+  isGeneratingCaptions = false
+}: VideoPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -129,6 +139,7 @@ export function VideoPreview({ project, onFormatChange, analysis, captionSetting
 
   const isVertical = project.aspectRatio === '9:16';
   const hasAnalysis = analysis?.status === 'completed';
+  const hasTranscription = analysis?.transcription && analysis.transcription.segments?.length > 0;
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8">
@@ -157,10 +168,10 @@ export function VideoPreview({ project, onFormatChange, analysis, captionSetting
         />
 
         {/* Caption Overlay */}
-        {hasAnalysis && analysis?.transcription && (
+        {hasTranscription && (
           <CaptionOverlay
             currentTime={currentTime}
-            segments={analysis.transcription.segments}
+            segments={analysis!.transcription!.segments}
             settings={captionSettings}
             editedCaptions={editedCaptions}
           />
@@ -302,8 +313,31 @@ export function VideoPreview({ project, onFormatChange, analysis, captionSetting
 
       {/* Caption & Format Controls */}
       <div className="mt-6 flex items-center gap-4">
-        {/* Caption Settings Sheet */}
-        {hasAnalysis && analysis?.transcription && (
+        {/* Generate Captions button - show when no transcription exists */}
+        {!hasTranscription && onGenerateCaptions && (
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2"
+            onClick={onGenerateCaptions}
+            disabled={isGeneratingCaptions}
+          >
+            {isGeneratingCaptions ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Generating Captions...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Generate Captions
+              </>
+            )}
+          </Button>
+        )}
+
+        {/* Caption Settings Sheet - show when transcription exists */}
+        {hasTranscription && (
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
@@ -328,7 +362,7 @@ export function VideoPreview({ project, onFormatChange, analysis, captionSetting
                 </TabsContent>
                 <TabsContent value="editor" className="mt-4 h-[calc(100vh-200px)]">
                   <CaptionEditor
-                    segments={analysis.transcription.segments}
+                    segments={analysis!.transcription!.segments}
                     currentTime={currentTime}
                     editedCaptions={editedCaptions}
                     onEditCaption={handleEditCaption}

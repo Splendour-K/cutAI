@@ -36,9 +36,11 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const contentType = platformConfig.contentType;
 
   const { 
-    isAnalyzing: isRunningAnalysis, 
+    isAnalyzing: isRunningAnalysis,
+    isGeneratingCaptions,
     analysis, 
     analyzeVideo,
+    generateCaptions,
     fetchAnalysis 
   } = useVideoAnalysis();
 
@@ -90,13 +92,23 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     if (!project.id) return;
     
     try {
-      // For demo, we'll use a sample video URL
-      // In production, this would use the actual uploaded video
-      await analyzeVideo(project.id, undefined, project.videoUrl);
+      await analyzeVideo(project.id, project.videoFile, project.videoUrl);
     } catch (error) {
       console.error('Analysis failed:', error);
     }
-  }, [project.id, project.videoUrl, analyzeVideo]);
+  }, [project.id, project.videoFile, project.videoUrl, analyzeVideo]);
+
+  const handleGenerateCaptions = useCallback(async () => {
+    if (!project.id) return;
+    
+    try {
+      await generateCaptions(project.id, project.videoFile, project.videoUrl);
+      setCaptionSettings(prev => ({ ...prev, enabled: true }));
+      toast.success('Captions are now enabled');
+    } catch (error) {
+      console.error('Caption generation failed:', error);
+    }
+  }, [project.id, project.videoFile, project.videoUrl, generateCaptions]);
 
   const handleExport = useCallback(() => {
     setProject((prev) => ({ ...prev, status: 'exporting' }));
@@ -370,6 +382,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
             analysis={analysis}
             captionSettings={captionSettings}
             onCaptionSettingsChange={setCaptionSettings}
+            onGenerateCaptions={handleGenerateCaptions}
+            isGeneratingCaptions={isGeneratingCaptions}
           />
         </div>
       </div>
