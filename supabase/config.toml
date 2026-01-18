@@ -14,3 +14,12 @@ verify_jwt = false
 
 [functions.generate-storyboard]
 verify_jwt = false
+
+[functions.analyze-enhancements]
+verify_jwt = false
+
+[functions.generate-enhancement-image]
+verify_jwt = false
+
+[functions.generate-enhancement-sfx]
+verify_jwt = false
