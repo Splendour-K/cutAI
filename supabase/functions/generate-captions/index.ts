@@ -9,8 +9,6 @@ const corsHeaders = {
 interface CaptionRequest {
   projectId: string;
   videoUrl?: string;
-  videoBase64?: string;
-  mimeType?: string;
   skipPersistence?: boolean;
 }
 
@@ -36,17 +34,36 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { projectId, videoUrl, videoBase64, mimeType = 'video/mp4', skipPersistence = false }: CaptionRequest = await req.json();
+    // Parse request body - avoid holding large data in memory
+    const requestBody = await req.json();
+    const projectId = requestBody.projectId;
+    const videoUrl = requestBody.videoUrl;
+    const skipPersistence = requestBody.skipPersistence ?? false;
 
     if (!projectId) {
       throw new Error("Project ID is required");
+    }
+
+    // If videoBase64 was passed, reject it to prevent memory issues
+    if (requestBody.videoBase64) {
+      console.log("Rejecting base64 video - too large for edge function memory");
+      return new Response(JSON.stringify({
+        error: "Video is too large for processing. Please use a shorter video (under 30 seconds) or upload to storage first.",
+        code: "VIDEO_TOO_LARGE"
+      }), {
+        status: 413,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!videoUrl) {
+      throw new Error("videoUrl is required");
     }
 
     console.log(`Starting caption generation for project: ${projectId}, skipPersistence: ${skipPersistence}`);
 
     // Only update database if project exists (not a demo/temporary project)
     if (!skipPersistence) {
-      // Check if project exists first
       const { data: projectExists } = await supabase
         .from('video_projects')
         .select('id')
@@ -70,26 +87,13 @@ serve(async (req) => {
       }
     }
 
-    // Prepare the video content for Gemini
-    let videoContent: any;
-    
-    if (videoBase64) {
-      videoContent = {
-        type: "image_url",
-        image_url: {
-          url: `data:${mimeType};base64,${videoBase64}`
-        }
-      };
-    } else if (videoUrl) {
-      videoContent = {
-        type: "image_url",
-        image_url: {
-          url: videoUrl
-        }
-      };
-    } else {
-      throw new Error("Either videoUrl or videoBase64 is required");
-    }
+    // Use URL-based video content - much more memory efficient
+    const videoContent = {
+      type: "image_url",
+      image_url: {
+        url: videoUrl
+      }
+    };
 
     const systemPrompt = `You are an expert transcription AI. Your task is to transcribe all spoken content in the video with precise timestamps.
 
@@ -103,12 +107,6 @@ Your response must be a JSON object with this exact structure:
         "startTime": 0.0,
         "endTime": 3.5,
         "text": "First sentence or phrase spoken",
-        "speaker": "Speaker 1"
-      },
-      {
-        "startTime": 3.5,
-        "endTime": 7.2,
-        "text": "Second sentence or phrase spoken",
         "speaker": "Speaker 1"
       }
     ],
@@ -154,15 +152,18 @@ Guidelines:
       const errorText = await response.text();
       console.error("AI Gateway error:", response.status, errorText);
       
+      // Handle rate limiting
       if (response.status === 429) {
-        await supabase
-          .from('video_analysis')
-          .update({
-            analysis_status: 'error',
-            error_message: 'Rate limit exceeded. Please try again later.',
-            updated_at: new Date().toISOString()
-          })
-          .eq('project_id', projectId);
+        if (!skipPersistence) {
+          await supabase
+            .from('video_analysis')
+            .update({
+              analysis_status: 'error',
+              error_message: 'Rate limit exceeded. Please try again later.',
+              updated_at: new Date().toISOString()
+            })
+            .eq('project_id', projectId);
+        }
           
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
           status: 429,
@@ -170,15 +171,18 @@ Guidelines:
         });
       }
       
+      // Handle payment required
       if (response.status === 402) {
-        await supabase
-          .from('video_analysis')
-          .update({
-            analysis_status: 'error',
-            error_message: 'AI credits exhausted. Please add more credits.',
-            updated_at: new Date().toISOString()
-          })
-          .eq('project_id', projectId);
+        if (!skipPersistence) {
+          await supabase
+            .from('video_analysis')
+            .update({
+              analysis_status: 'error',
+              error_message: 'AI credits exhausted. Please add more credits.',
+              updated_at: new Date().toISOString()
+            })
+            .eq('project_id', projectId);
+        }
           
         return new Response(JSON.stringify({ error: "AI credits exhausted. Please add more credits." }), {
           status: 402,
@@ -200,7 +204,6 @@ Guidelines:
     // Parse the JSON response
     let transcriptionResult;
     try {
-      // Remove markdown code blocks if present
       const cleanedContent = content.replace(/```json\n?|\n?```/g, '').trim();
       transcriptionResult = JSON.parse(cleanedContent);
     } catch (parseError) {
@@ -229,7 +232,6 @@ Guidelines:
 
         if (saveError) {
           console.error("Error saving transcription:", saveError);
-          // Don't throw - still return results to user
         } else {
           console.log("Caption generation completed and saved successfully");
         }
