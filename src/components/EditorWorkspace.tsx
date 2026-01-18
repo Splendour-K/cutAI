@@ -5,12 +5,14 @@ import { EditorHeader } from './EditorHeader';
 import { AnalyzingOverlay } from './AnalyzingOverlay';
 import { EditHistory } from './EditHistory';
 import { CaptionEditorPanel } from './CaptionEditorPanel';
+import { AIEditorPanel } from './AIEditorPanel';
 import { useVideoChat } from '@/hooks/useVideoChat';
 import { useVideoAnalysis } from '@/hooks/useVideoAnalysis';
+import { useEnhancementWorkflow } from '@/hooks/useEnhancementWorkflow';
 import type { VideoProject, EditAction, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2 } from 'lucide-react';
+import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles } from 'lucide-react';
 import { AnimationWorkflowPanel } from './AnimationWorkflowPanel';
 import { useAnimationWorkflow } from '@/hooks/useAnimationWorkflow';
 import { useBrandPresets } from '@/hooks/useBrandPresets';
@@ -72,6 +74,9 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
 
   // Brand presets
   const brandPresets = useBrandPresets();
+
+  // Enhancement workflow (AI Editor)
+  const enhancementWorkflow = useEnhancementWorkflow({ projectId: project.id });
 
   // Fetch existing analysis on mount
   useEffect(() => {
@@ -209,6 +214,10 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 <Wand2 className="w-3.5 h-3.5" />
                 Animate
               </TabsTrigger>
+              <TabsTrigger value="ai-editor" className="gap-1.5 text-xs px-2.5 py-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                AI Editor
+              </TabsTrigger>
               <TabsTrigger value="settings" className="gap-1.5 text-xs px-2.5 py-1.5">
                 <Settings2 className="w-3.5 h-3.5" />
                 Format
@@ -260,6 +269,27 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 onDeletePreset={brandPresets.deletePreset}
                 onSetDefaultPreset={brandPresets.setDefaultPreset}
                 onDuplicatePreset={brandPresets.duplicatePreset}
+              />
+            </TabsContent>
+
+            <TabsContent value="ai-editor" className="flex-1 m-0 min-h-0">
+              <AIEditorPanel
+                workflow={enhancementWorkflow.workflow}
+                hasTranscript={hasTranscription}
+                onAnalyze={enhancementWorkflow.analyzeForEnhancements}
+                onApprove={enhancementWorkflow.approveEnhancement}
+                onReject={enhancementWorkflow.rejectEnhancement}
+                onApproveAll={enhancementWorkflow.approveAll}
+                onGenerate={enhancementWorkflow.generateEnhancementContent}
+                onGenerateAll={enhancementWorkflow.generateApproved}
+                onRemove={enhancementWorkflow.removeEnhancement}
+                onUpdatePosition={enhancementWorkflow.repositionEnhancement}
+                onUpdateTiming={enhancementWorkflow.retimeEnhancement}
+                onReset={enhancementWorkflow.resetWorkflow}
+                transcript={analysis?.transcription ? {
+                  fullText: analysis.transcription.fullText,
+                  segments: analysis.transcription.segments
+                } : undefined}
               />
             </TabsContent>
 
