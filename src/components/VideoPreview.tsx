@@ -18,6 +18,8 @@ interface VideoPreviewProps {
   isGeneratingCaptions?: boolean;
   editedCaptions?: Record<number, string>;
   isEditingCaptions?: boolean;
+  onTimeUpdate?: (time: number) => void;
+  onEditCaption?: (index: number, text: string) => void;
   compact?: boolean;
 }
 
@@ -31,6 +33,8 @@ export function VideoPreview({
   isGeneratingCaptions = false,
   editedCaptions = {},
   isEditingCaptions = false,
+  onTimeUpdate,
+  onEditCaption,
   compact = false
 }: VideoPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -46,7 +50,10 @@ export function VideoPreview({
     const video = videoRef.current;
     if (!video) return;
 
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+    const handleTimeUpdate = () => {
+      setCurrentTime(video.currentTime);
+      onTimeUpdate?.(video.currentTime);
+    };
     const handleLoadedMetadata = () => setDuration(video.duration);
     const handleEnded = () => setIsPlaying(false);
 
@@ -59,7 +66,7 @@ export function VideoPreview({
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('ended', handleEnded);
     };
-  }, []);
+  }, [onTimeUpdate]);
 
   const togglePlay = useCallback(() => {
     if (videoRef.current) {
@@ -83,19 +90,25 @@ export function VideoPreview({
     if (videoRef.current) {
       videoRef.current.currentTime = time;
       setCurrentTime(time);
+      onTimeUpdate?.(time);
     }
-  }, []);
+  }, [onTimeUpdate]);
 
   const handleRestart = useCallback(() => {
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
       setCurrentTime(0);
+      onTimeUpdate?.(0);
     }
-  }, []);
+  }, [onTimeUpdate]);
 
   const handlePositionChange = useCallback((position: { x: number; y: number }) => {
     onCaptionSettingsChange({ ...captionSettings, customPosition: position });
   }, [captionSettings, onCaptionSettingsChange]);
+
+  const handleCaptionTextChange = useCallback((segmentIndex: number, text: string) => {
+    onEditCaption?.(segmentIndex, text);
+  }, [onEditCaption]);
 
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
@@ -123,8 +136,8 @@ export function VideoPreview({
 
   return (
     <div className={cn(
-      "flex flex-col items-center justify-center",
-      compact ? "p-4" : "p-8"
+      "flex flex-col items-center justify-center w-full",
+      compact ? "p-4" : "p-2"
     )}>
       {/* Platform indicator */}
       {!compact && (
@@ -164,6 +177,7 @@ export function VideoPreview({
             containerRef={containerRef}
             isEditing={isEditingCaptions}
             onPositionChange={handlePositionChange}
+            onTextChange={handleCaptionTextChange}
           />
         )}
 

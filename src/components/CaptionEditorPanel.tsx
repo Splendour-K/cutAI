@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Captions, Type, Palette, Move, Sparkles, Grip, RotateCcw } from 'lucide-react';
+import { Captions, Type, Palette, Move, Sparkles, Grip, RotateCcw, Plus, Minus, Edit3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Slider } from '@/components/ui/slider';
 import {
   Select,
   SelectContent,
@@ -39,10 +40,10 @@ const FONT_FAMILIES = [
 ];
 
 const FONT_SIZES = [
-  { id: 'small', name: 'S' },
-  { id: 'medium', name: 'M' },
-  { id: 'large', name: 'L' },
-  { id: 'xlarge', name: 'XL' },
+  { id: 'small', name: 'S', value: 14 },
+  { id: 'medium', name: 'M', value: 18 },
+  { id: 'large', name: 'L', value: 24 },
+  { id: 'xlarge', name: 'XL', value: 32 },
 ];
 
 const POSITIONS = [
@@ -72,6 +73,7 @@ export function CaptionEditorPanel({
   onEditModeChange
 }: CaptionEditorPanelProps) {
   const [activeTab, setActiveTab] = useState('style');
+  const [scale, setScale] = useState(100);
 
   const updateSetting = <K extends keyof CaptionSettings>(
     key: K,
@@ -82,6 +84,14 @@ export function CaptionEditorPanel({
 
   const resetPosition = () => {
     onSettingsChange({ ...settings, customPosition: undefined });
+  };
+
+  const handleScaleChange = (value: number[]) => {
+    setScale(value[0]);
+    // Map scale to font size
+    const sizes = ['small', 'medium', 'large', 'xlarge'] as const;
+    const index = Math.min(Math.floor((value[0] - 50) / 30), 3);
+    updateSetting('fontSize', sizes[index]);
   };
 
   const activeSegmentIndex = segments?.findIndex(
@@ -97,7 +107,7 @@ export function CaptionEditorPanel({
   return (
     <div className="h-full flex flex-col bg-surface/50">
       {/* Header */}
-      <div className="p-4 border-b border-border flex items-center justify-between">
+      <div className="p-4 border-b border-border flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
           <Captions className="w-5 h-5 text-primary" />
           <h3 className="font-semibold text-foreground">Captions</h3>
@@ -109,225 +119,266 @@ export function CaptionEditorPanel({
       </div>
 
       {settings.enabled && (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="mx-4 mt-3 grid grid-cols-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="mx-4 mt-3 grid grid-cols-3 flex-shrink-0">
             <TabsTrigger value="style" className="text-xs">Style</TabsTrigger>
             <TabsTrigger value="customize" className="text-xs">Customize</TabsTrigger>
             <TabsTrigger value="text" className="text-xs">Edit Text</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1">
+          <div className="flex-1 min-h-0 overflow-hidden">
             {/* Style Tab */}
-            <TabsContent value="style" className="p-4 space-y-4 m-0">
-              <CaptionStylePicker
-                selectedStyle={settings.style}
-                selectedAnimation={settings.animation || 'none'}
-                onStyleChange={(style) => updateSetting('style', style)}
-                onAnimationChange={(animation) => updateSetting('animation', animation)}
-              />
+            <TabsContent value="style" className="h-full m-0 data-[state=active]:flex data-[state=active]:flex-col">
+              <ScrollArea className="flex-1">
+                <div className="p-4 space-y-4">
+                  <CaptionStylePicker
+                    selectedStyle={settings.style}
+                    selectedAnimation={settings.animation || 'none'}
+                    onStyleChange={(style) => updateSetting('style', style)}
+                    onAnimationChange={(animation) => updateSetting('animation', animation)}
+                  />
+                </div>
+              </ScrollArea>
             </TabsContent>
 
             {/* Customize Tab */}
-            <TabsContent value="customize" className="p-4 space-y-5 m-0">
-              {/* Position Controls */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <Move className="w-4 h-4 text-muted-foreground" />
-                    Position
-                  </Label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onEditModeChange(!isEditMode)}
-                    className={cn(
-                      "gap-1 text-xs h-7",
-                      isEditMode && "bg-primary text-primary-foreground"
+            <TabsContent value="customize" className="h-full m-0 data-[state=active]:flex data-[state=active]:flex-col">
+              <ScrollArea className="flex-1">
+                <div className="p-4 space-y-5">
+                  {/* Canvas Edit Mode Toggle */}
+                  <div className="p-3 rounded-xl bg-primary/10 border border-primary/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Edit3 className="w-4 h-4 text-primary" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Canvas Edit Mode</p>
+                          <p className="text-xs text-muted-foreground">Drag, resize, and edit on video</p>
+                        </div>
+                      </div>
+                      <Button
+                        variant={isEditMode ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => onEditModeChange(!isEditMode)}
+                        className="gap-1"
+                      >
+                        <Grip className="w-3 h-3" />
+                        {isEditMode ? 'Editing' : 'Enable'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Position Controls */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Move className="w-4 h-4 text-muted-foreground" />
+                        Position
+                      </Label>
+                    </div>
+
+                    <div className="flex gap-2">
+                      {POSITIONS.map((pos) => (
+                        <button
+                          key={pos.id}
+                          onClick={() => {
+                            updateSetting('position', pos.id);
+                            resetPosition();
+                          }}
+                          className={cn(
+                            'flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-all',
+                            settings.position === pos.id && !settings.customPosition
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border hover:border-muted-foreground/50'
+                          )}
+                        >
+                          {pos.icon} {pos.name}
+                        </button>
+                      ))}
+                    </div>
+
+                    {settings.customPosition && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={resetPosition}
+                        className="w-full gap-2"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Reset Custom Position
+                      </Button>
                     )}
-                  >
-                    <Grip className="w-3 h-3" />
-                    {isEditMode ? 'Done' : 'Drag'}
-                  </Button>
-                </div>
+                  </div>
 
-                <div className="flex gap-2">
-                  {POSITIONS.map((pos) => (
-                    <button
-                      key={pos.id}
-                      onClick={() => {
-                        updateSetting('position', pos.id);
-                        resetPosition();
-                      }}
-                      className={cn(
-                        'flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-all',
-                        settings.position === pos.id && !settings.customPosition
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border hover:border-muted-foreground/50'
-                      )}
+                  {/* Size/Scale Control */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Type className="w-4 h-4 text-muted-foreground" />
+                      Size & Scale
+                    </Label>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Minus className="w-4 h-4 text-muted-foreground" />
+                        <Slider
+                          value={[scale]}
+                          onValueChange={handleScaleChange}
+                          min={50}
+                          max={150}
+                          step={10}
+                          className="flex-1"
+                        />
+                        <Plus className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-xs font-mono w-10 text-right">{scale}%</span>
+                      </div>
+
+                      <div className="flex gap-1">
+                        {FONT_SIZES.map((size) => (
+                          <button
+                            key={size.id}
+                            onClick={() => updateSetting('fontSize', size.id as CaptionSettings['fontSize'])}
+                            className={cn(
+                              'flex-1 py-1.5 rounded-md border text-xs font-medium transition-all',
+                              settings.fontSize === size.id
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border hover:border-muted-foreground/50'
+                            )}
+                          >
+                            {size.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Font Settings */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Font Family</Label>
+                    
+                    <Select
+                      value={settings.fontFamily || 'Inter'}
+                      onValueChange={(value) => updateSetting('fontFamily', value)}
                     >
-                      {pos.icon} {pos.name}
-                    </button>
-                  ))}
-                </div>
+                      <SelectTrigger className="h-9">
+                        <SelectValue placeholder="Select font" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FONT_FAMILIES.map((font) => (
+                          <SelectItem key={font.id} value={font.id}>
+                            <span style={{ fontFamily: font.id }}>{font.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                {settings.customPosition && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={resetPosition}
-                    className="w-full gap-2"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    Reset Custom Position
-                  </Button>
-                )}
-              </div>
+                  {/* Colors */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Palette className="w-4 h-4 text-muted-foreground" />
+                      Colors
+                    </Label>
 
-              {/* Font Settings */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <Type className="w-4 h-4 text-muted-foreground" />
-                  Font
-                </Label>
-                
-                <Select
-                  value={settings.fontFamily || 'Inter'}
-                  onValueChange={(value) => updateSetting('fontFamily', value)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select font" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FONT_FAMILIES.map((font) => (
-                      <SelectItem key={font.id} value={font.id}>
-                        <span style={{ fontFamily: font.id }}>{font.name}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Text Color</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {PRESET_COLORS.map((preset) => (
+                          <button
+                            key={preset.name}
+                            onClick={() => updateSetting('textColor', preset.color)}
+                            className={cn(
+                              'w-8 h-8 rounded-full border-2 transition-all',
+                              settings.textColor === preset.color
+                                ? 'border-primary ring-2 ring-primary/30'
+                                : 'border-transparent hover:border-muted-foreground/50'
+                            )}
+                            style={{ backgroundColor: preset.color }}
+                            title={preset.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
 
-                <div className="flex gap-1">
-                  {FONT_SIZES.map((size) => (
-                    <button
-                      key={size.id}
-                      onClick={() => updateSetting('fontSize', size.id as CaptionSettings['fontSize'])}
-                      className={cn(
-                        'flex-1 py-1.5 rounded-md border text-xs font-medium transition-all',
-                        settings.fontSize === size.id
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border hover:border-muted-foreground/50'
-                      )}
-                    >
-                      {size.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Highlight Color</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {PRESET_COLORS.slice(1).map((preset) => (
+                          <button
+                            key={preset.name}
+                            onClick={() => updateSetting('brandColor', preset.color)}
+                            className={cn(
+                              'w-8 h-8 rounded-full border-2 transition-all',
+                              settings.brandColor === preset.color
+                                ? 'border-primary ring-2 ring-primary/30'
+                                : 'border-transparent hover:border-muted-foreground/50'
+                            )}
+                            style={{ backgroundColor: preset.color }}
+                            title={preset.name}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Colors */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium flex items-center gap-2">
-                  <Palette className="w-4 h-4 text-muted-foreground" />
-                  Colors
-                </Label>
-
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">Text Color</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {PRESET_COLORS.map((preset) => (
-                      <button
-                        key={preset.name}
-                        onClick={() => updateSetting('textColor', preset.color)}
-                        className={cn(
-                          'w-8 h-8 rounded-full border-2 transition-all',
-                          settings.textColor === preset.color
-                            ? 'border-primary ring-2 ring-primary/30'
-                            : 'border-transparent hover:border-muted-foreground/50'
-                        )}
-                        style={{ backgroundColor: preset.color }}
-                        title={preset.name}
-                      />
-                    ))}
+                  {/* Highlight Keywords Toggle */}
+                  <div className="flex items-center justify-between pt-3 border-t border-border">
+                    <Label htmlFor="highlight-toggle" className="text-sm flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-muted-foreground" />
+                      Highlight Keywords
+                    </Label>
+                    <Switch
+                      id="highlight-toggle"
+                      checked={settings.highlightKeywords}
+                      onCheckedChange={(checked) => updateSetting('highlightKeywords', checked)}
+                    />
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">Highlight Color</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {PRESET_COLORS.slice(1).map((preset) => (
-                      <button
-                        key={preset.name}
-                        onClick={() => updateSetting('brandColor', preset.color)}
-                        className={cn(
-                          'w-8 h-8 rounded-full border-2 transition-all',
-                          settings.brandColor === preset.color
-                            ? 'border-primary ring-2 ring-primary/30'
-                            : 'border-transparent hover:border-muted-foreground/50'
-                        )}
-                        style={{ backgroundColor: preset.color }}
-                        title={preset.name}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Highlight Keywords Toggle */}
-              <div className="flex items-center justify-between pt-3 border-t border-border">
-                <Label htmlFor="highlight-toggle" className="text-sm flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-muted-foreground" />
-                  Highlight Keywords
-                </Label>
-                <Switch
-                  id="highlight-toggle"
-                  checked={settings.highlightKeywords}
-                  onCheckedChange={(checked) => updateSetting('highlightKeywords', checked)}
-                />
-              </div>
+              </ScrollArea>
             </TabsContent>
 
             {/* Text Tab */}
-            <TabsContent value="text" className="m-0 h-full">
+            <TabsContent value="text" className="h-full m-0 data-[state=active]:flex data-[state=active]:flex-col">
               {segments && segments.length > 0 ? (
-                <div className="divide-y divide-border">
-                  {segments.map((segment, index) => {
-                    const isActive = index === activeSegmentIndex;
-                    const text = editedCaptions[index] ?? segment.text;
-                    
-                    return (
-                      <div
-                        key={index}
-                        className={cn(
-                          'p-3 transition-colors cursor-pointer',
-                          isActive && 'bg-primary/5'
-                        )}
-                        onClick={() => onSeek(segment.startTime)}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-muted-foreground font-mono">
-                            {formatTime(segment.startTime)}
-                          </span>
-                          {isActive && (
-                            <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">
-                              Playing
-                            </span>
-                          )}
-                        </div>
-                        <textarea
-                          value={text}
-                          onChange={(e) => onEditCaption(index, e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
+                <ScrollArea className="flex-1">
+                  <div className="divide-y divide-border">
+                    {segments.map((segment, index) => {
+                      const isActive = index === activeSegmentIndex;
+                      const text = editedCaptions[index] ?? segment.text;
+                      
+                      return (
+                        <div
+                          key={index}
                           className={cn(
-                            'w-full bg-transparent resize-none text-sm text-foreground',
-                            'focus:outline-none focus:bg-surface-elevated focus:rounded-md focus:p-2 focus:-m-2',
-                            'transition-all'
+                            'p-3 transition-colors cursor-pointer',
+                            isActive && 'bg-primary/5'
                           )}
-                          rows={2}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
+                          onClick={() => onSeek(segment.startTime)}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-muted-foreground font-mono">
+                              {formatTime(segment.startTime)}
+                            </span>
+                            {isActive && (
+                              <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                                Playing
+                              </span>
+                            )}
+                          </div>
+                          <textarea
+                            value={text}
+                            onChange={(e) => onEditCaption(index, e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn(
+                              'w-full bg-transparent resize-none text-sm text-foreground',
+                              'focus:outline-none focus:bg-surface-elevated focus:rounded-md focus:p-2 focus:-m-2',
+                              'transition-all'
+                            )}
+                            rows={2}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
               ) : (
                 <div className="p-8 text-center text-muted-foreground">
                   <Captions className="w-10 h-10 mx-auto mb-3 opacity-50" />
@@ -336,7 +387,7 @@ export function CaptionEditorPanel({
                 </div>
               )}
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
       )}
     </div>

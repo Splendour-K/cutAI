@@ -8,6 +8,7 @@ interface DraggableCaptionOverlayProps {
   segments: TranscriptSegment[] | null;
   settings: CaptionSettings;
   onPositionChange?: (position: { x: number; y: number }) => void;
+  onTextChange?: (segmentIndex: number, text: string) => void;
   editedCaptions?: Record<number, string>;
   containerRef?: React.RefObject<HTMLDivElement>;
   isEditing?: boolean;
@@ -18,14 +19,19 @@ export function DraggableCaptionOverlay({
   segments,
   settings,
   onPositionChange,
+  onTextChange,
   editedCaptions = {},
   containerRef,
   isEditing = false
 }: DraggableCaptionOverlayProps) {
   const captionRef = useRef<HTMLDivElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [isTextEditing, setIsTextEditing] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [localPosition, setLocalPosition] = useState(settings.customPosition);
+  const [localScale, setLocalScale] = useState(1);
 
   // Get current caption and word timing data
   const captionData = useMemo(() => {
@@ -59,9 +65,18 @@ export function DraggableCaptionOverlay({
     };
   }, [currentTime, segments, settings.enabled, editedCaptions]);
 
+  // Handle double-click for text editing
+  const handleDoubleClick = useCallback((e: React.MouseEvent) => {
+    if (!isEditing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsTextEditing(true);
+    setTimeout(() => textInputRef.current?.focus(), 0);
+  }, [isEditing]);
+
   // Handle drag start
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!isEditing) return;
+    if (!isEditing || isTextEditing) return;
     e.preventDefault();
     setIsDragging(true);
     const rect = captionRef.current?.getBoundingClientRect();
@@ -71,10 +86,10 @@ export function DraggableCaptionOverlay({
         y: e.clientY - rect.top - rect.height / 2
       });
     }
-  }, [isEditing]);
+  }, [isEditing, isTextEditing]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (!isEditing) return;
+    if (!isEditing || isTextEditing) return;
     e.preventDefault();
     setIsDragging(true);
     const touch = e.touches[0];
@@ -85,7 +100,7 @@ export function DraggableCaptionOverlay({
         y: touch.clientY - rect.top - rect.height / 2
       });
     }
-  }, [isEditing]);
+  }, [isEditing, isTextEditing]);
 
   // Handle drag move
   useEffect(() => {
@@ -133,6 +148,25 @@ export function DraggableCaptionOverlay({
     setLocalPosition(settings.customPosition);
   }, [settings.customPosition]);
 
+  // Handle text input blur
+  const handleTextBlur = useCallback(() => {
+    setIsTextEditing(false);
+  }, []);
+
+  const handleTextChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (captionData && onTextChange) {
+      onTextChange(captionData.index, e.target.value);
+    }
+  }, [captionData, onTextChange]);
+
+  // Handle scroll/pinch to resize
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!isEditing) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setLocalScale(prev => Math.max(0.5, Math.min(2, prev + delta)));
+  }, [isEditing]);
+
   if (!settings.enabled || !captionData) return null;
 
   const position = localPosition || settings.customPosition;
@@ -142,18 +176,18 @@ export function DraggableCaptionOverlay({
       return {
         left: `${position.x}%`,
         top: `${position.y}%`,
-        transform: 'translate(-50%, -50%)'
+        transform: `translate(-50%, -50%) scale(${localScale})`
       };
     }
     
     switch (settings.position) {
       case 'top':
-        return { top: '8%', left: '50%', transform: 'translateX(-50%)' };
+        return { top: '8%', left: '50%', transform: `translateX(-50%) scale(${localScale})` };
       case 'center':
-        return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+        return { top: '50%', left: '50%', transform: `translate(-50%, -50%) scale(${localScale})` };
       case 'bottom':
       default:
-        return { bottom: '15%', left: '50%', transform: 'translateX(-50%)' };
+        return { bottom: '15%', left: '50%', transform: `translateX(-50%) scale(${localScale})` };
     }
   };
 
@@ -182,24 +216,48 @@ export function DraggableCaptionOverlay({
       className={cn(
         'absolute max-w-[90%] z-20',
         'transition-all duration-100',
-        isEditing && 'cursor-move ring-2 ring-primary/50 ring-offset-2',
-        isDragging && 'opacity-80',
+        isEditing && 'cursor-move ring-2 ring-primary/50 ring-offset-2 ring-offset-transparent',
+        isDragging && 'opacity-80 cursor-grabbing',
+        isTextEditing && 'ring-primary cursor-text',
         getAnimationClass()
       )}
       style={getPositionStyle()}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
+      onDoubleClick={handleDoubleClick}
+      onWheel={handleWheel}
     >
-      <CaptionContent
-        captionData={captionData}
-        settings={settings}
-        isDragging={isDragging}
-      />
+      {isTextEditing ? (
+        <textarea
+          ref={textInputRef}
+          value={captionData.text}
+          onChange={handleTextChange}
+          onBlur={handleTextBlur}
+          className="bg-background/90 text-foreground px-4 py-2 rounded-lg text-center resize-none border-2 border-primary outline-none min-w-[200px]"
+          style={{ 
+            fontFamily: settings.fontFamily || 'Inter',
+            fontSize: settings.fontSize === 'xlarge' ? '1.5rem' : settings.fontSize === 'large' ? '1.25rem' : '1rem'
+          }}
+          rows={2}
+          autoFocus
+        />
+      ) : (
+        <CaptionContent
+          captionData={captionData}
+          settings={settings}
+          isDragging={isDragging}
+        />
+      )}
       
-      {isEditing && (
-        <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded whitespace-nowrap">
-          Drag to reposition
-        </div>
+      {isEditing && !isTextEditing && (
+        <>
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded whitespace-nowrap">
+            Drag • Double-click to edit • Scroll to resize
+          </div>
+          {/* Resize handles */}
+          <div className="absolute -right-2 -bottom-2 w-4 h-4 bg-primary rounded-full cursor-se-resize opacity-70 hover:opacity-100" />
+          <div className="absolute -left-2 -bottom-2 w-4 h-4 bg-primary rounded-full cursor-sw-resize opacity-70 hover:opacity-100" />
+        </>
       )}
     </div>
   );
