@@ -23,8 +23,8 @@ import type { TranscriptSegment } from '@/hooks/useVideoAnalysis';
 
 interface AnimationWorkflowPanelProps {
   workflow: AnimationWorkflow;
-  onAnalyzeContext: (transcript?: { fullText: string; segments: TranscriptSegment[] }) => Promise<void>;
-  onGenerateStoryboard: (style: VisualStyle) => Promise<void>;
+  onAnalyzeContext: (transcript?: { fullText: string; segments: TranscriptSegment[] }) => Promise<any>;
+  onGenerateStoryboard: (style: VisualStyle) => Promise<any>;
   onApproveElement: (elementId: string) => void;
   onUnapproveElement: (elementId: string) => void;
   onApproveAll: () => void;
