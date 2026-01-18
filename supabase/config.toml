@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.video-chat]
 verify_jwt = false
+
+[functions.generate-captions]
+verify_jwt = false
+
+[functions.analyze-context]
+verify_jwt = false
+
+[functions.generate-storyboard]
+verify_jwt = false

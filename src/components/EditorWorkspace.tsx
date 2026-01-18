@@ -10,7 +10,9 @@ import { useVideoAnalysis } from '@/hooks/useVideoAnalysis';
 import type { VideoProject, EditAction, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, History, Settings2, Brain, Loader2, Captions } from 'lucide-react';
+import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2 } from 'lucide-react';
+import { AnimationWorkflowPanel } from './AnimationWorkflowPanel';
+import { useAnimationWorkflow } from '@/hooks/useAnimationWorkflow';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -58,6 +60,13 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     platform: project.platform,
     contentType,
     analysisContext: analysis,
+  });
+
+  // Animation workflow
+  const animationWorkflow = useAnimationWorkflow({
+    projectId: project.id,
+    videoFile: project.videoFile,
+    videoUrl: project.videoUrl,
   });
 
   // Fetch existing analysis on mount
@@ -192,6 +201,10 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                   </span>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="animate" className="gap-1.5 text-xs px-2.5 py-1.5">
+                <Wand2 className="w-3.5 h-3.5" />
+                Animate
+              </TabsTrigger>
               <TabsTrigger value="settings" className="gap-1.5 text-xs px-2.5 py-1.5">
                 <Settings2 className="w-3.5 h-3.5" />
                 Format
@@ -218,6 +231,25 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 onSeek={handleSeek}
                 isEditMode={isEditingCaptions}
                 onEditModeChange={setIsEditingCaptions}
+              />
+            </TabsContent>
+
+            <TabsContent value="animate" className="flex-1 m-0 min-h-0">
+              <AnimationWorkflowPanel
+                workflow={animationWorkflow.workflow}
+                onAnalyzeContext={animationWorkflow.analyzeContext}
+                onGenerateStoryboard={animationWorkflow.generateStoryboard}
+                onApproveElement={animationWorkflow.approveElement}
+                onUnapproveElement={animationWorkflow.unapproveElement}
+                onApproveAll={animationWorkflow.approveAllElements}
+                onProceedToPreview={animationWorkflow.proceedToPreview}
+                onApplyAnimations={animationWorkflow.applyAnimations}
+                onReset={animationWorkflow.resetWorkflow}
+                onGoToStep={animationWorkflow.goToStep}
+                existingTranscript={analysis?.transcription ? {
+                  fullText: analysis.transcription.fullText,
+                  segments: analysis.transcription.segments
+                } : undefined}
               />
             </TabsContent>
 
