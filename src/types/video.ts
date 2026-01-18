@@ -84,15 +84,23 @@ export interface EditAction {
   timestamp: Date;
 }
 
+export type CaptionStyle = 'modern' | 'minimal' | 'bold' | 'subtitle' | 'hormozi' | 'karaoke' | 'pop' | 'glide' | 'bounce';
+export type CaptionAnimation = 'none' | 'word-by-word' | 'pop' | 'pulse' | 'glide' | 'bounce' | 'typewriter' | 'wave';
+
 export interface CaptionSettings {
   enabled: boolean;
-  style: 'modern' | 'minimal' | 'bold' | 'subtitle';
+  style: CaptionStyle;
+  animation: CaptionAnimation;
   position: 'top' | 'center' | 'bottom';
+  customPosition?: { x: number; y: number }; // For drag positioning
   highlightKeywords: boolean;
   brandColor?: string;
   fontFamily?: string;
   fontSize?: 'small' | 'medium' | 'large' | 'xlarge';
   textColor?: string;
+  backgroundColor?: string;
+  strokeColor?: string;
+  strokeWidth?: number;
 }
 
 export interface ChatMessage {

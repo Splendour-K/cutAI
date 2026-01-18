@@ -4,12 +4,13 @@ import { VideoPreview } from './VideoPreview';
 import { EditorHeader } from './EditorHeader';
 import { AnalyzingOverlay } from './AnalyzingOverlay';
 import { EditHistory } from './EditHistory';
+import { CaptionEditorPanel } from './CaptionEditorPanel';
 import { useVideoChat } from '@/hooks/useVideoChat';
 import { useVideoAnalysis } from '@/hooks/useVideoAnalysis';
 import type { VideoProject, EditAction, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, History, Settings2, Brain, Loader2 } from 'lucide-react';
+import { MessageSquare, History, Settings2, Brain, Loader2, Captions } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -22,16 +23,20 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const [project, setProject] = useState<VideoProject>(initialProject);
   const [isAnalyzing, setIsAnalyzing] = useState(true);
   const [activeTab, setActiveTab] = useState('chat');
+  const [editedCaptions, setEditedCaptions] = useState<Record<number, string>>({});
+  const [isEditingCaptions, setIsEditingCaptions] = useState(false);
   const [captionSettings, setCaptionSettings] = useState<CaptionSettings>({
     enabled: false,
     style: 'modern',
+    animation: 'none',
     position: 'bottom',
     highlightKeywords: false,
     fontFamily: 'Inter',
     fontSize: 'medium',
-    textColor: 'hsl(210, 20%, 95%)',
-    brandColor: 'hsl(185, 85%, 50%)'
+    textColor: 'hsl(0, 0%, 100%)',
+    brandColor: 'hsl(45, 100%, 55%)'
   });
+  
   const platformConfig = PLATFORM_CONFIGS[project.platform];
   const contentType = platformConfig.contentType;
 
@@ -75,7 +80,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
       // Handle caption-related edits
       if (editAction.type === 'caption') {
         setCaptionSettings(prev => ({ ...prev, enabled: true }));
-        toast.success('Captions enabled');
+        setActiveTab('captions');
+        toast.success('Captions enabled! Customize the style in the Captions tab.');
       }
       
       setProject((prev) => ({ 
@@ -102,11 +108,11 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     if (!project.id) return;
     
     try {
-      // Skip persistence for demo/blob URLs (not stored in database)
       const skipPersistence = project.videoUrl?.startsWith('blob:') ?? false;
       await generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
       setCaptionSettings(prev => ({ ...prev, enabled: true }));
-      toast.success('Captions are now enabled');
+      setActiveTab('captions');
+      toast.success('Captions generated! Choose a style to customize.');
     } catch (error) {
       console.error('Caption generation failed:', error);
     }
@@ -132,6 +138,16 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     }));
   }, []);
 
+  const handleEditCaption = useCallback((index: number, text: string) => {
+    setEditedCaptions(prev => ({ ...prev, [index]: text }));
+  }, []);
+
+  const handleSeek = useCallback((time: number) => {
+    // This will be connected to VideoPreview's seek
+  }, []);
+
+  const hasTranscription = analysis?.transcription && analysis.transcription.segments?.length > 0;
+
   return (
     <div className="h-screen flex flex-col bg-background">
       {isAnalyzing && <AnalyzingOverlay onComplete={handleAnalysisComplete} />}
@@ -139,32 +155,36 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
       <EditorHeader project={project} onBack={onBack} onExport={handleExport} />
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel */}
-        <div className="w-[400px] border-r border-border flex-shrink-0 bg-surface/50 flex flex-col">
+        {/* Left Panel - Chat/Analysis */}
+        <div className="w-[360px] border-r border-border flex-shrink-0 bg-surface/50 flex flex-col">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            <TabsList className="w-full justify-start px-4 pt-2 bg-transparent border-b border-border rounded-none">
-              <TabsTrigger value="chat" className="gap-2">
-                <MessageSquare className="w-4 h-4" />
+            <TabsList className="w-full justify-start px-3 pt-2 bg-transparent border-b border-border rounded-none h-auto flex-wrap gap-1">
+              <TabsTrigger value="chat" className="gap-1.5 text-xs px-2.5 py-1.5">
+                <MessageSquare className="w-3.5 h-3.5" />
                 Chat
               </TabsTrigger>
-              <TabsTrigger value="analysis" className="gap-2">
-                <Brain className="w-4 h-4" />
-                Analysis
-                {analysis?.status === 'completed' && (
-                  <span className="ml-1 w-2 h-2 rounded-full bg-green-500" />
+              <TabsTrigger value="captions" className="gap-1.5 text-xs px-2.5 py-1.5">
+                <Captions className="w-3.5 h-3.5" />
+                Captions
+                {hasTranscription && (
+                  <span className="ml-1 w-1.5 h-1.5 rounded-full bg-green-500" />
                 )}
               </TabsTrigger>
-              <TabsTrigger value="history" className="gap-2">
-                <History className="w-4 h-4" />
+              <TabsTrigger value="analysis" className="gap-1.5 text-xs px-2.5 py-1.5">
+                <Brain className="w-3.5 h-3.5" />
+                Analysis
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-1.5 text-xs px-2.5 py-1.5">
+                <History className="w-3.5 h-3.5" />
                 Edits
                 {project.edits.length > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/20 text-primary rounded-full">
+                  <span className="ml-1 px-1 py-0.5 text-[10px] bg-primary/20 text-primary rounded">
                     {project.edits.filter(e => e.applied).length}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="settings" className="gap-2">
-                <Settings2 className="w-4 h-4" />
+              <TabsTrigger value="settings" className="gap-1.5 text-xs px-2.5 py-1.5">
+                <Settings2 className="w-3.5 h-3.5" />
                 Format
               </TabsTrigger>
             </TabsList>
@@ -175,6 +195,20 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 onSendMessage={handleSendMessage}
                 isProcessing={isProcessing}
                 platform={project.platform}
+              />
+            </TabsContent>
+
+            <TabsContent value="captions" className="flex-1 m-0 overflow-hidden">
+              <CaptionEditorPanel
+                settings={captionSettings}
+                onSettingsChange={setCaptionSettings}
+                segments={analysis?.transcription?.segments}
+                currentTime={0}
+                editedCaptions={editedCaptions}
+                onEditCaption={handleEditCaption}
+                onSeek={handleSeek}
+                isEditMode={isEditingCaptions}
+                onEditModeChange={setIsEditingCaptions}
               />
             </TabsContent>
 
@@ -223,22 +257,15 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
 
               {analysis?.status === 'completed' && (
                 <div className="space-y-4">
-                  {/* Transcription */}
                   {analysis.transcription && (
                     <div className="p-4 rounded-xl bg-surface-elevated/50 border border-border/50">
                       <h4 className="text-sm font-medium text-foreground mb-2">Transcription</h4>
                       <p className="text-sm text-muted-foreground line-clamp-4">
                         {analysis.transcription.fullText || 'No transcription available'}
                       </p>
-                      {analysis.transcription.language && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Language: {analysis.transcription.language}
-                        </p>
-                      )}
                     </div>
                   )}
 
-                  {/* Pauses */}
                   {analysis.pauses && analysis.pauses.length > 0 && (
                     <div className="p-4 rounded-xl bg-surface-elevated/50 border border-border/50">
                       <h4 className="text-sm font-medium text-foreground mb-2">
@@ -253,16 +280,10 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                             <span className="text-foreground">{pause.duration.toFixed(1)}s</span>
                           </div>
                         ))}
-                        {analysis.pauses.length > 5 && (
-                          <p className="text-xs text-muted-foreground">
-                            +{analysis.pauses.length - 5} more pauses
-                          </p>
-                        )}
                       </div>
                     </div>
                   )}
 
-                  {/* Key Moments */}
                   {analysis.keyMoments && analysis.keyMoments.length > 0 && (
                     <div className="p-4 rounded-xl bg-surface-elevated/50 border border-border/50">
                       <h4 className="text-sm font-medium text-foreground mb-2">
@@ -286,37 +307,6 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                               </span>
                             </div>
                             <p className="text-xs text-foreground">{moment.description}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Suggested Edits */}
-                  {analysis.suggestedEdits && analysis.suggestedEdits.length > 0 && (
-                    <div className="p-4 rounded-xl bg-surface-elevated/50 border border-border/50">
-                      <h4 className="text-sm font-medium text-foreground mb-2">
-                        Suggested Edits ({analysis.suggestedEdits.length})
-                      </h4>
-                      <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {analysis.suggestedEdits.map((edit, i) => (
-                          <div key={i} className="p-2 rounded-lg bg-surface/50">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={`px-1.5 py-0.5 text-xs rounded ${
-                                edit.priority === 'high' 
-                                  ? 'bg-destructive/20 text-destructive' 
-                                  : edit.priority === 'medium'
-                                    ? 'bg-yellow-500/20 text-yellow-600'
-                                    : 'bg-muted text-muted-foreground'
-                              }`}>
-                                {edit.type}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {edit.startTime.toFixed(1)}s
-                              </span>
-                            </div>
-                            <p className="text-xs text-foreground">{edit.description}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{edit.reason}</p>
                           </div>
                         ))}
                       </div>
@@ -376,8 +366,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
           </Tabs>
         </div>
 
-        {/* Video Preview */}
-        <div className="flex-1 bg-background">
+        {/* Video Preview - Sticky in center */}
+        <div className="flex-1 flex items-center justify-center bg-background overflow-auto">
           <VideoPreview 
             project={project} 
             onFormatChange={handleFormatChange}
@@ -386,6 +376,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
             onCaptionSettingsChange={setCaptionSettings}
             onGenerateCaptions={handleGenerateCaptions}
             isGeneratingCaptions={isGeneratingCaptions}
+            editedCaptions={editedCaptions}
+            isEditingCaptions={isEditingCaptions}
           />
         </div>
       </div>

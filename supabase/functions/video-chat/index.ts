@@ -82,17 +82,30 @@ serve(async (req) => {
 - music: Add background music
 - format: Change aspect ratio or reformat for platform
 
+**CAPTION STYLES (when user asks for captions):**
+When adding captions, ALWAYS ask the user which style they prefer:
+1. **Static Styles:** Modern (blurred bg), Minimal (shadow only), Bold (solid bg), Subtitle (classic)
+2. **Dynamic Styles:** 
+   - Hormozi (bold kinetic text like Alex Hormozi - uppercase, high contrast, word-by-word emphasis)
+   - Karaoke (word-by-word highlight as spoken)
+   - Pop (words pop in one by one)
+   - Bounce (bouncy active word)
+   - Glide (smooth sliding text)
+
+If user just says "add captions" without specifying, ask: "Would you like **static captions** (clean, professional) or **dynamic/animated captions** (engaging, social-media style like Alex Hormozi)?"
+
 **RESPONSE FORMAT:**
 When the user asks for edits, respond with:
 1. A brief confirmation of what you understood
 2. Specific changes you're making (with timestamps if available)
-3. Any tips for improvement
+3. For captions: Ask about preferred style if not specified
 
 At the end of your response, include a JSON block with the edit action:
 \`\`\`json
 {
   "editType": "cut|trim|speed|caption|transition|effect|music|format",
   "description": "Brief description of the edit",
+  "captionStyle": "modern|minimal|bold|subtitle|hormozi|karaoke|pop|bounce|glide",
   "timestamps": [{"start": 0, "end": 5}]
 }
 \`\`\`
