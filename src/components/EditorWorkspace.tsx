@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { ChatPanel } from './ChatPanel';
 import { VideoPreview } from './VideoPreview';
 import { EditorHeader } from './EditorHeader';
@@ -25,6 +25,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const [activeTab, setActiveTab] = useState('chat');
   const [editedCaptions, setEditedCaptions] = useState<Record<number, string>>({});
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [captionSettings, setCaptionSettings] = useState<CaptionSettings>({
     enabled: false,
     style: 'modern',
@@ -81,6 +82,14 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
       if (editAction.type === 'caption') {
         setCaptionSettings(prev => ({ ...prev, enabled: true }));
         setActiveTab('captions');
+        
+        // If no transcription exists, generate captions
+        const hasTranscription = analysis?.transcription && analysis.transcription.segments?.length > 0;
+        if (!hasTranscription && project.id) {
+          const skipPersistence = project.videoUrl?.startsWith('blob:') ?? false;
+          generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+        }
+        
         toast.success('Captions enabled! Customize the style in the Captions tab.');
       }
       
@@ -92,7 +101,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     } else {
       setProject((prev) => ({ ...prev, status: 'ready' }));
     }
-  }, [sendMessage]);
+  }, [sendMessage, analysis, project.id, project.videoFile, project.videoUrl, generateCaptions]);
 
   const handleRunAnalysis = useCallback(async () => {
     if (!project.id) return;
@@ -143,22 +152,22 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   }, []);
 
   const handleSeek = useCallback((time: number) => {
-    // This will be connected to VideoPreview's seek
+    setCurrentVideoTime(time);
   }, []);
 
   const hasTranscription = analysis?.transcription && analysis.transcription.segments?.length > 0;
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
       {isAnalyzing && <AnalyzingOverlay onComplete={handleAnalysisComplete} />}
 
       <EditorHeader project={project} onBack={onBack} onExport={handleExport} />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0">
         {/* Left Panel - Chat/Analysis */}
-        <div className="w-[360px] border-r border-border flex-shrink-0 bg-surface/50 flex flex-col">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            <TabsList className="w-full justify-start px-3 pt-2 bg-transparent border-b border-border rounded-none h-auto flex-wrap gap-1">
+        <div className="w-[360px] border-r border-border flex-shrink-0 bg-surface/50 flex flex-col min-h-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+            <TabsList className="w-full justify-start px-3 pt-2 bg-transparent border-b border-border rounded-none h-auto flex-wrap gap-1 flex-shrink-0">
               <TabsTrigger value="chat" className="gap-1.5 text-xs px-2.5 py-1.5">
                 <MessageSquare className="w-3.5 h-3.5" />
                 Chat
@@ -189,7 +198,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
               </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
+            <TabsContent value="chat" className="flex-1 m-0 min-h-0">
               <ChatPanel
                 messages={messages}
                 onSendMessage={handleSendMessage}
@@ -198,12 +207,12 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
               />
             </TabsContent>
 
-            <TabsContent value="captions" className="flex-1 m-0 overflow-hidden">
+            <TabsContent value="captions" className="flex-1 m-0 min-h-0">
               <CaptionEditorPanel
                 settings={captionSettings}
                 onSettingsChange={setCaptionSettings}
                 segments={analysis?.transcription?.segments}
-                currentTime={0}
+                currentTime={currentVideoTime}
                 editedCaptions={editedCaptions}
                 onEditCaption={handleEditCaption}
                 onSeek={handleSeek}
@@ -212,7 +221,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
               />
             </TabsContent>
 
-            <TabsContent value="analysis" className="flex-1 m-0 overflow-auto p-4 space-y-4">
+            <TabsContent value="analysis" className="flex-1 m-0 min-h-0 overflow-auto p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-foreground">AI Video Analysis</h3>
                 <Button 
@@ -316,11 +325,11 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
               )}
             </TabsContent>
             
-            <TabsContent value="history" className="flex-1 m-0 overflow-auto">
+            <TabsContent value="history" className="flex-1 m-0 min-h-0 overflow-auto">
               <EditHistory edits={project.edits} onUndo={handleUndoEdit} />
             </TabsContent>
             
-            <TabsContent value="settings" className="flex-1 m-0 p-4 space-y-6">
+            <TabsContent value="settings" className="flex-1 m-0 min-h-0 overflow-auto p-4 space-y-6">
               <div>
                 <h3 className="text-sm font-medium text-foreground mb-3">Output Format</h3>
                 <div className="grid grid-cols-2 gap-2">
@@ -367,7 +376,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
         </div>
 
         {/* Video Preview - Sticky in center */}
-        <div className="flex-1 flex items-center justify-center bg-background overflow-auto">
+        <div className="flex-1 flex items-center justify-center bg-background overflow-auto p-4">
           <VideoPreview 
             project={project} 
             onFormatChange={handleFormatChange}
@@ -378,6 +387,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
             isGeneratingCaptions={isGeneratingCaptions}
             editedCaptions={editedCaptions}
             isEditingCaptions={isEditingCaptions}
+            onTimeUpdate={setCurrentVideoTime}
+            onEditCaption={handleEditCaption}
           />
         </div>
       </div>

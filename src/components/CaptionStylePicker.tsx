@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { CaptionStyle, CaptionAnimation } from '@/types/video';
 import { Sparkles, Type, Zap, Music2, Target, ArrowRight } from 'lucide-react';
@@ -177,50 +178,55 @@ interface StyleCardProps {
   isDynamic?: boolean;
 }
 
-function StyleCard({ style, isSelected, onClick, isDynamic }: StyleCardProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'relative p-3 rounded-xl border text-left transition-all group overflow-hidden',
-        isSelected
-          ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
-          : 'border-border hover:border-primary/50 hover:bg-surface-elevated'
-      )}
-    >
-      {isDynamic && (
-        <div className="absolute top-1 right-1">
-          <Sparkles className="w-3 h-3 text-primary" />
+const StyleCard = forwardRef<HTMLButtonElement, StyleCardProps>(
+  ({ style, isSelected, onClick, isDynamic }, ref) => {
+    return (
+      <button
+        ref={ref}
+        onClick={onClick}
+        className={cn(
+          'relative p-3 rounded-xl border text-left transition-all group overflow-hidden',
+          isSelected
+            ? 'border-primary bg-primary/10 ring-1 ring-primary/30'
+            : 'border-border hover:border-primary/50 hover:bg-surface-elevated'
+        )}
+      >
+        {isDynamic && (
+          <div className="absolute top-1 right-1">
+            <Sparkles className="w-3 h-3 text-primary" />
+          </div>
+        )}
+        
+        <div className="flex items-center gap-2 mb-1">
+          <span className={cn(
+            'p-1 rounded',
+            isSelected ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+          )}>
+            {style.icon}
+          </span>
+          <span className="text-sm font-medium text-foreground">{style.name}</span>
         </div>
-      )}
-      
-      <div className="flex items-center gap-2 mb-1">
-        <span className={cn(
-          'p-1 rounded',
-          isSelected ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+        
+        <p className="text-xs text-muted-foreground">{style.description}</p>
+        
+        {/* Mini preview */}
+        <div className={cn(
+          'mt-2 px-2 py-1 rounded text-xs font-bold',
+          style.id === 'hormozi' && 'bg-black text-white uppercase tracking-wider',
+          style.id === 'karaoke' && 'bg-background/60 text-primary',
+          style.id === 'pop' && 'bg-transparent text-foreground',
+          style.id === 'bounce' && 'bg-transparent text-foreground',
+          style.id === 'glide' && 'bg-gradient-to-r from-transparent via-background/80 to-transparent',
+          style.id === 'modern' && 'bg-background/80 backdrop-blur-sm text-foreground rounded-lg',
+          style.id === 'minimal' && 'bg-transparent text-foreground shadow-lg',
+          style.id === 'bold' && 'bg-primary text-primary-foreground',
+          style.id === 'subtitle' && 'bg-background/90 text-foreground'
         )}>
-          {style.icon}
-        </span>
-        <span className="text-sm font-medium text-foreground">{style.name}</span>
-      </div>
-      
-      <p className="text-xs text-muted-foreground">{style.description}</p>
-      
-      {/* Mini preview */}
-      <div className={cn(
-        'mt-2 px-2 py-1 rounded text-xs font-bold',
-        style.id === 'hormozi' && 'bg-black text-white uppercase tracking-wider',
-        style.id === 'karaoke' && 'bg-background/60 text-primary',
-        style.id === 'pop' && 'bg-transparent text-foreground',
-        style.id === 'bounce' && 'bg-transparent text-foreground',
-        style.id === 'glide' && 'bg-gradient-to-r from-transparent via-background/80 to-transparent',
-        style.id === 'modern' && 'bg-background/80 backdrop-blur-sm text-foreground rounded-lg',
-        style.id === 'minimal' && 'bg-transparent text-foreground shadow-lg',
-        style.id === 'bold' && 'bg-primary text-primary-foreground',
-        style.id === 'subtitle' && 'bg-background/90 text-foreground'
-      )}>
-        {style.preview}
-      </div>
-    </button>
-  );
-}
+          {style.preview}
+        </div>
+      </button>
+    );
+  }
+);
+
+StyleCard.displayName = 'StyleCard';

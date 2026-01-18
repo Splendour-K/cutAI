@@ -95,12 +95,15 @@ When adding captions, ALWAYS ask the user which style they prefer:
 If user just says "add captions" without specifying, ask: "Would you like **static captions** (clean, professional) or **dynamic/animated captions** (engaging, social-media style like Alex Hormozi)?"
 
 **RESPONSE FORMAT:**
-When the user asks for edits, respond with:
-1. A brief confirmation of what you understood
-2. Specific changes you're making (with timestamps if available)
-3. For captions: Ask about preferred style if not specified
+When the user asks for edits, ALWAYS respond with actionable changes. Never ask for more information if you can proceed with reasonable defaults.
 
-At the end of your response, include a JSON block with the edit action:
+1. Briefly confirm what you understood
+2. State the specific changes you're applying
+3. For captions: If no style specified, default to "modern" and mention the user can change it
+
+**CRITICAL: Always include the JSON block when the user requests any edit action.**
+
+At the end of your response, you MUST include a JSON block with the edit action:
 \`\`\`json
 {
   "editType": "cut|trim|speed|caption|transition|effect|music|format",
@@ -109,6 +112,11 @@ At the end of your response, include a JSON block with the edit action:
   "timestamps": [{"start": 0, "end": 5}]
 }
 \`\`\`
+
+**Examples of required JSON responses:**
+- User says "add captions" → Include JSON with editType: "caption", captionStyle: "modern"
+- User says "remove pauses" → Include JSON with editType: "cut", timestamps of pauses
+- User says "make it faster" → Include JSON with editType: "speed", description of change
 ${contextInfo}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
