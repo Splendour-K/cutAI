@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import type { Storyboard, StoryboardScene, StoryboardElement } from '@/types/animation';
+import { AnimationPreviewModal } from './AnimationPreviewModal';
+import type { Storyboard, StoryboardScene, StoryboardElement, VisualStyle } from '@/types/animation';
 
 interface StoryboardReviewProps {
   storyboard: Storyboard | null;
@@ -22,6 +23,7 @@ interface StoryboardReviewProps {
   onUnapproveElement: (elementId: string) => void;
   onApproveAll: () => void;
   onProceed: () => void;
+  style?: VisualStyle;
 }
 
 export function StoryboardReview({
@@ -31,8 +33,10 @@ export function StoryboardReview({
   onUnapproveElement,
   onApproveAll,
   onProceed,
+  style,
 }: StoryboardReviewProps) {
   const [expandedScenes, setExpandedScenes] = useState<string[]>([]);
+  const [previewElement, setPreviewElement] = useState<StoryboardElement | null>(null);
 
   if (!storyboard) {
     return (
@@ -154,6 +158,7 @@ export function StoryboardReview({
                         isApproved={approvedElements.includes(element.id)}
                         onApprove={() => onApproveElement(element.id)}
                         onUnapprove={() => onUnapproveElement(element.id)}
+                        onPreview={() => setPreviewElement(element)}
                       />
                     ))}
                   </div>
@@ -163,6 +168,14 @@ export function StoryboardReview({
           })}
         </div>
       </ScrollArea>
+
+      {/* Animation Preview Modal */}
+      <AnimationPreviewModal
+        isOpen={!!previewElement}
+        onClose={() => setPreviewElement(null)}
+        element={previewElement}
+        style={style}
+      />
     </div>
   );
 }
@@ -172,9 +185,10 @@ interface ElementCardProps {
   isApproved: boolean;
   onApprove: () => void;
   onUnapprove: () => void;
+  onPreview: () => void;
 }
 
-function ElementCard({ element, isApproved, onApprove, onUnapprove }: ElementCardProps) {
+function ElementCard({ element, isApproved, onApprove, onUnapprove, onPreview }: ElementCardProps) {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -233,7 +247,11 @@ function ElementCard({ element, isApproved, onApprove, onUnapprove }: ElementCar
           </div>
         </div>
 
-        <button className="p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0">
+        <button 
+          onClick={onPreview}
+          className="p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0"
+          title="Preview animation"
+        >
           <Play className="w-3.5 h-3.5 text-muted-foreground" />
         </button>
       </div>

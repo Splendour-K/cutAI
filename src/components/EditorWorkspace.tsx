@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2 } from 'lucide-react';
 import { AnimationWorkflowPanel } from './AnimationWorkflowPanel';
 import { useAnimationWorkflow } from '@/hooks/useAnimationWorkflow';
+import { useBrandPresets } from '@/hooks/useBrandPresets';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -68,6 +69,9 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     videoFile: project.videoFile,
     videoUrl: project.videoUrl,
   });
+
+  // Brand presets
+  const brandPresets = useBrandPresets();
 
   // Fetch existing analysis on mount
   useEffect(() => {
@@ -250,6 +254,12 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                   fullText: analysis.transcription.fullText,
                   segments: analysis.transcription.segments
                 } : undefined}
+                brandPresets={brandPresets.presets}
+                onCreatePreset={brandPresets.createPreset}
+                onUpdatePreset={brandPresets.updatePreset}
+                onDeletePreset={brandPresets.deletePreset}
+                onSetDefaultPreset={brandPresets.setDefaultPreset}
+                onDuplicatePreset={brandPresets.duplicatePreset}
               />
             </TabsContent>
 
