@@ -20,6 +20,7 @@ import { AnimationStyleSelector } from './AnimationStyleSelector';
 import { StoryboardReview } from './StoryboardReview';
 import type { AnimationWorkflow, VisualStyle, Storyboard, WorkflowStep } from '@/types/animation';
 import type { TranscriptSegment } from '@/hooks/useVideoAnalysis';
+import type { BrandPreset } from '@/hooks/useBrandPresets';
 
 interface AnimationWorkflowPanelProps {
   workflow: AnimationWorkflow;
@@ -33,6 +34,13 @@ interface AnimationWorkflowPanelProps {
   onReset: () => void;
   onGoToStep: (step: WorkflowStep) => void;
   existingTranscript?: { fullText: string; segments: TranscriptSegment[] };
+  // Brand presets props
+  brandPresets: BrandPreset[];
+  onCreatePreset: (name: string, description: string, style: VisualStyle) => BrandPreset;
+  onUpdatePreset: (presetId: string, updates: Partial<Omit<BrandPreset, 'id' | 'createdAt'>>) => void;
+  onDeletePreset: (presetId: string) => void;
+  onSetDefaultPreset: (presetId: string) => void;
+  onDuplicatePreset: (presetId: string) => BrandPreset | undefined;
 }
 
 const WORKFLOW_STEPS = [
@@ -56,6 +64,12 @@ export function AnimationWorkflowPanel({
   onReset,
   onGoToStep,
   existingTranscript,
+  brandPresets,
+  onCreatePreset,
+  onUpdatePreset,
+  onDeletePreset,
+  onSetDefaultPreset,
+  onDuplicatePreset,
 }: AnimationWorkflowPanelProps) {
   const [selectedStyle, setSelectedStyle] = useState<VisualStyle | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -146,6 +160,12 @@ export function AnimationWorkflowPanel({
               selectedStyle={selectedStyle}
               onSelectStyle={setSelectedStyle}
               videoContext={workflow.videoContext}
+              brandPresets={brandPresets}
+              onCreatePreset={onCreatePreset}
+              onUpdatePreset={onUpdatePreset}
+              onDeletePreset={onDeletePreset}
+              onSetDefaultPreset={onSetDefaultPreset}
+              onDuplicatePreset={onDuplicatePreset}
             />
 
             <Button 
@@ -193,6 +213,7 @@ export function AnimationWorkflowPanel({
             onUnapproveElement={onUnapproveElement}
             onApproveAll={onApproveAll}
             onProceed={onProceedToPreview}
+            style={selectedStyle ?? undefined}
           />
         );
 
