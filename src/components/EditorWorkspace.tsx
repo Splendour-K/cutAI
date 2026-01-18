@@ -290,6 +290,9 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                   fullText: analysis.transcription.fullText,
                   segments: analysis.transcription.segments
                 } : undefined}
+                videoDuration={project.duration || 60}
+                currentTime={currentVideoTime}
+                onSeek={handleSeek}
               />
             </TabsContent>
 

@@ -37,6 +37,8 @@ interface EnhancementReviewPanelProps {
   onUpdatePosition: (id: string, position: { x: number; y: number; scale: number }) => void;
   onUpdateTiming: (id: string, startTime: number, endTime: number) => void;
   onPreview: (enhancement: Enhancement) => void;
+  selectedId?: string | null;
+  onSelect?: (id: string | null) => void;
 }
 
 const ENHANCEMENT_ICONS: Record<EnhancementType, typeof Image> = {
@@ -64,9 +66,18 @@ export function EnhancementReviewPanel({
   onUpdatePosition,
   onUpdateTiming,
   onPreview,
+  selectedId,
+  onSelect,
 }: EnhancementReviewPanelProps) {
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['all']);
-  const [selectedEnhancement, setSelectedEnhancement] = useState<string | null>(null);
+
+  // Use external selection if provided, otherwise internal
+  const selectedEnhancement = selectedId;
+  const handleSelect = (id: string | null) => {
+    if (onSelect) {
+      onSelect(id);
+    }
+  };
 
   // Group enhancements by type
   const groupedEnhancements = workflow.enhancements.reduce((acc, e) => {
@@ -211,7 +222,7 @@ export function EnhancementReviewPanel({
                       key={enhancement.id}
                       enhancement={enhancement}
                       isSelected={selectedEnhancement === enhancement.id}
-                      onSelect={() => setSelectedEnhancement(
+                      onSelect={() => handleSelect(
                         selectedEnhancement === enhancement.id ? null : enhancement.id
                       )}
                       onApprove={() => onApprove(enhancement.id)}

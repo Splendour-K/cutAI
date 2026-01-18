@@ -4,17 +4,21 @@ import {
   Wand2,
   Loader2,
   RotateCcw,
-  Play
+  Play,
+  Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { EnhancementReviewPanel } from './EnhancementReviewPanel';
 import { EnhancementPreviewModal } from './EnhancementPreviewModal';
+import { EnhancementTimeline } from './EnhancementTimeline';
 import type { EnhancementWorkflow, Enhancement } from '@/types/enhancement';
 import type { TranscriptSegment } from '@/hooks/useVideoAnalysis';
+import { ChevronDown } from 'lucide-react';
 
 interface AIEditorPanelProps {
   workflow: EnhancementWorkflow;
@@ -31,6 +35,9 @@ interface AIEditorPanelProps {
   onReset: () => void;
   transcript?: { fullText: string; segments: TranscriptSegment[] };
   videoContext?: { genre?: string; mood?: string[]; pacing?: string };
+  videoDuration?: number;
+  currentTime?: number;
+  onSeek?: (time: number) => void;
 }
 
 export function AIEditorPanel({
@@ -48,9 +55,19 @@ export function AIEditorPanel({
   onReset,
   transcript,
   videoContext,
+  videoDuration = 60,
+  currentTime = 0,
+  onSeek,
 }: AIEditorPanelProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [previewEnhancement, setPreviewEnhancement] = useState<Enhancement | null>(null);
+  const [selectedEnhancementId, setSelectedEnhancementId] = useState<string | null>(null);
+  const [isTimelineOpen, setIsTimelineOpen] = useState(true);
+
+  // Count approved/ready enhancements for timeline
+  const timelineEnhancements = workflow.enhancements.filter(
+    e => e.status === 'approved' || e.status === 'ready' || e.status === 'generating'
+  );
 
   const handleStartAnalysis = async () => {
     if (!transcript) return;
@@ -150,6 +167,41 @@ export function AIEditorPanel({
         </Button>
       </div>
 
+      {/* Enhancement Timeline - Collapsible */}
+      {timelineEnhancements.length > 0 && (
+        <Collapsible open={isTimelineOpen} onOpenChange={setIsTimelineOpen}>
+          <CollapsibleTrigger asChild>
+            <button className="w-full p-2 border-b border-border bg-surface/30 flex items-center justify-between text-xs text-muted-foreground hover:bg-surface/50 transition-colors">
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Enhancement Timeline</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[10px]">
+                  {timelineEnhancements.length}
+                </span>
+              </div>
+              <ChevronDown className={cn(
+                "w-4 h-4 transition-transform",
+                isTimelineOpen && "rotate-180"
+              )} />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="p-3 border-b border-border bg-surface/20">
+              <EnhancementTimeline
+                enhancements={workflow.enhancements}
+                duration={videoDuration}
+                currentTime={currentTime}
+                onSeek={onSeek}
+                onUpdateTiming={onUpdateTiming}
+                onRemove={onRemove}
+                onSelect={setSelectedEnhancementId}
+                selectedId={selectedEnhancementId}
+              />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
       {/* Main Content */}
       <EnhancementReviewPanel
         workflow={workflow}
@@ -162,6 +214,8 @@ export function AIEditorPanel({
         onUpdatePosition={onUpdatePosition}
         onUpdateTiming={onUpdateTiming}
         onPreview={setPreviewEnhancement}
+        selectedId={selectedEnhancementId}
+        onSelect={setSelectedEnhancementId}
       />
 
       {/* Preview Modal */}
