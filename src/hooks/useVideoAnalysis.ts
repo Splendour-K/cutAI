@@ -163,23 +163,79 @@ export function useVideoAnalysis() {
     });
 
     try {
-      let requestBody: { projectId: string; videoUrl?: string; videoBase64?: string; mimeType?: string; skipPersistence?: boolean } = {
-        projectId,
-        skipPersistence
-      };
+      let finalVideoUrl = videoUrl;
 
+      // If we have a file, upload it to storage first to avoid memory issues
       if (videoFile) {
-        const base64 = await fileToBase64(videoFile);
-        requestBody.videoBase64 = base64;
-        requestBody.mimeType = videoFile.type;
-      } else if (videoUrl) {
-        requestBody.videoUrl = videoUrl;
-      } else {
-        throw new Error("Either a video file or URL is required");
+        // Check file size - if > 5MB, we need to upload to storage
+        const fileSizeMB = videoFile.size / (1024 * 1024);
+        
+        if (fileSizeMB > 5) {
+          toast.info('Uploading video for processing...');
+          
+          // Upload to Supabase storage
+          const fileName = `temp_${projectId}_${Date.now()}.${videoFile.name.split('.').pop()}`;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('videos')
+            .upload(fileName, videoFile, {
+              cacheControl: '3600',
+              upsert: true
+            });
+
+          if (uploadError) {
+            console.error('Upload error:', uploadError);
+            throw new Error('Failed to upload video for processing');
+          }
+
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from('videos')
+            .getPublicUrl(fileName);
+          
+          finalVideoUrl = urlData.publicUrl;
+        } else {
+          // For small files, still try to use URL if available, otherwise use a temp blob URL
+          if (!videoUrl) {
+            // Create a temporary object URL - note this won't work for server-side
+            // We'll need to upload for caption generation
+            toast.info('Uploading video for processing...');
+            
+            const fileName = `temp_${projectId}_${Date.now()}.${videoFile.name.split('.').pop()}`;
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('videos')
+              .upload(fileName, videoFile, {
+                cacheControl: '3600',
+                upsert: true
+              });
+
+            if (uploadError) {
+              throw new Error('Failed to upload video for processing');
+            }
+
+            const { data: urlData } = supabase.storage
+              .from('videos')
+              .getPublicUrl(fileName);
+            
+            finalVideoUrl = urlData.publicUrl;
+          }
+        }
+      }
+
+      if (!finalVideoUrl) {
+        throw new Error("Could not get a valid video URL for processing");
+      }
+
+      // For blob URLs, we can't process server-side
+      if (finalVideoUrl.startsWith('blob:')) {
+        throw new Error("Video needs to be uploaded to storage for caption generation. Please save your project first.");
       }
 
       const { data, error } = await supabase.functions.invoke('generate-captions', {
-        body: requestBody
+        body: {
+          projectId,
+          videoUrl: finalVideoUrl,
+          skipPersistence
+        }
       });
 
       if (error) {
@@ -187,6 +243,9 @@ export function useVideoAnalysis() {
       }
 
       if (data.error) {
+        if (data.code === 'VIDEO_TOO_LARGE') {
+          throw new Error('Video is too large for processing. Please use a shorter video (under 2 minutes).');
+        }
         throw new Error(data.error);
       }
 
@@ -214,6 +273,8 @@ export function useVideoAnalysis() {
         toast.error('Rate limit exceeded. Please try again in a moment.');
       } else if (errorMessage.includes('credits')) {
         toast.error('AI credits exhausted. Please add more credits.');
+      } else if (errorMessage.includes('too large')) {
+        toast.error(errorMessage);
       } else {
         toast.error(`Caption generation failed: ${errorMessage}`);
       }
