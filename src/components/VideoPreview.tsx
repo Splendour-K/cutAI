@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, Captions, Loader2, Sparkles, Eye } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, Captions, Loader2, Sparkles, Eye, Music } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { VideoTimeline } from './VideoTimeline';
 import { DraggableCaptionOverlay } from './DraggableCaptionOverlay';
@@ -56,6 +58,7 @@ export function VideoPreview({
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [bRollDuckingLevel, setBRollDuckingLevel] = useState(15); // 0-100 percentage
 
   // Edited playback hook - handles skipping excluded sections
   const editedPlayback = useEditedPlayback({
@@ -76,12 +79,12 @@ export function VideoPreview({
   });
 
   // Audio ducking - fades main audio when B-roll is active
-  useAudioDucking({
+  const { isDucked } = useAudioDucking({
     videoRef: videoRef as React.RefObject<HTMLVideoElement>,
     activeBRoll,
     isPreviewEnabled: isPreviewingEdits,
-    duckedVolume: 0.15, // 15% volume during B-roll
-    fadeDuration: 300,  // 300ms fade
+    duckedVolume: bRollDuckingLevel / 100, // Convert percentage to 0-1
+    fadeDuration: 300,
   });
 
   const platformConfig = PLATFORM_CONFIGS[project.platform];
@@ -322,6 +325,48 @@ export function VideoPreview({
                 >
                   {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                 </Button>
+                
+                {/* B-Roll Ducking Control */}
+                {edl && edl.bRollSuggestions && edl.bRollSuggestions.length > 0 && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-7 w-7 hover:bg-foreground/10",
+                          isDucked ? "text-primary" : "text-foreground"
+                        )}
+                        title="B-Roll Audio Ducking"
+                      >
+                        <Music className="w-3.5 h-3.5" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent 
+                      side="top" 
+                      className="w-48 p-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium">B-Roll Ducking</span>
+                          <span className="text-xs text-muted-foreground">{bRollDuckingLevel}%</span>
+                        </div>
+                        <Slider
+                          value={[bRollDuckingLevel]}
+                          onValueChange={(value) => setBRollDuckingLevel(value[0])}
+                          min={0}
+                          max={100}
+                          step={5}
+                          className="w-full"
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                          Main audio level when B-roll plays
+                        </p>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
                 <span className="text-xs text-foreground/80 font-mono ml-1">
                   {formatTime(currentTime)} / {formatTime(displayDuration)}
                   {isPreviewingEdits && edl && (
