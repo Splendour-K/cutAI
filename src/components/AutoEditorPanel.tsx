@@ -51,6 +51,7 @@ interface AutoEditorPanelProps {
   
   // B-roll controls
   onToggleBRoll: (id: string) => void;
+  onSetBRollFootage?: (id: string, url: string, attribution?: string) => void;
   onApproveAllBRoll: () => void;
   
   // Zoom controls
@@ -89,6 +90,7 @@ export function AutoEditorPanel({
   onToggleSegment,
   onUpdateSegmentCut,
   onToggleBRoll,
+  onSetBRollFootage,
   onApproveAllBRoll,
   onToggleZoom,
   onUpdateZoom,
@@ -348,6 +350,7 @@ export function AutoEditorPanel({
             onToggle={onToggleBRoll}
             onApproveAll={onApproveAllBRoll}
             onSeek={onSeek}
+            onSetFootage={onSetBRollFootage}
           />
         )}
 

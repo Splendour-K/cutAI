@@ -323,6 +323,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 onToggleSegment={autoEditor.toggleSegmentInclusion}
                 onUpdateSegmentCut={autoEditor.updateSegmentCut}
                 onToggleBRoll={autoEditor.toggleBRoll}
+                onSetBRollFootage={autoEditor.setBRollFootage}
                 onApproveAllBRoll={autoEditor.approveAllBRoll}
                 onToggleZoom={autoEditor.toggleZoom}
                 onUpdateZoom={autoEditor.updateZoom}
