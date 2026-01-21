@@ -179,6 +179,31 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     });
   }, []);
 
+  // Set stock footage for B-roll
+  const setBRollFootage = useCallback((brollId: string, stockFootageUrl: string, attribution?: string) => {
+    setWorkflow(prev => {
+      if (!prev.edl) return prev;
+      
+      return {
+        ...prev,
+        edl: {
+          ...prev.edl,
+          bRollSuggestions: prev.edl.bRollSuggestions.map(br => 
+            br.id === brollId 
+              ? { 
+                  ...br, 
+                  stockFootageUrl, 
+                  status: 'ready' as const,
+                  reason: attribution ? `${br.reason} | ${attribution}` : br.reason,
+                }
+              : br
+          ),
+        },
+        hasUnapprovedChanges: true,
+      };
+    });
+  }, []);
+
   // Approve all B-roll suggestions
   const approveAllBRoll = useCallback(() => {
     setWorkflow(prev => {
@@ -339,6 +364,7 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     toggleSegmentInclusion,
     updateSegmentCut,
     toggleBRoll,
+    setBRollFootage,
     approveAllBRoll,
     toggleZoom,
     updateZoom,
