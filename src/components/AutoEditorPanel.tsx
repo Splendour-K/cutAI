@@ -34,6 +34,7 @@ interface AutoEditorPanelProps {
   hasTranscript: boolean;
   videoDuration: number;
   currentTime: number;
+  platform?: string;
   onSeek?: (time: number) => void;
   
   // Analysis
@@ -63,9 +64,9 @@ interface AutoEditorPanelProps {
   onGoToStep: (step: AutoEditorWorkflow['reviewStep']) => void;
   
   // Actions
-  onApply: () => void;
+  onApplyEdits: () => void;
   onReset: () => void;
-  getStats: () => any;
+  stats: any;
 }
 
 const REVIEW_STEPS = [
@@ -81,6 +82,7 @@ export function AutoEditorPanel({
   hasTranscript,
   videoDuration,
   currentTime,
+  platform = 'youtube',
   onSeek,
   onAnalyze,
   transcript,
@@ -94,9 +96,9 @@ export function AutoEditorPanel({
   onNextStep,
   onPrevStep,
   onGoToStep,
-  onApply,
+  onApplyEdits,
   onReset,
-  getStats,
+  stats,
 }: AutoEditorPanelProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -112,7 +114,7 @@ export function AutoEditorPanel({
   }>({
     targetStyle: 'auto',
     targetDurationReduction: 20,
-    platform: 'youtube',
+    platform,
     preferences: {
       enableZooms: true,
       enableBRoll: true,
@@ -120,7 +122,6 @@ export function AutoEditorPanel({
     },
   });
 
-  const stats = getStats();
   const currentStepIndex = REVIEW_STEPS.findIndex(s => s.id === workflow.reviewStep);
 
   const handleStartAnalysis = async () => {
@@ -403,7 +404,7 @@ export function AutoEditorPanel({
           {workflow.reviewStep === 'preview' ? (
             <Button
               size="sm"
-              onClick={onApply}
+              onClick={onApplyEdits}
               disabled={workflow.status === 'applying'}
               className="gap-2"
             >

@@ -6,13 +6,15 @@ import { AnalyzingOverlay } from './AnalyzingOverlay';
 import { EditHistory } from './EditHistory';
 import { CaptionEditorPanel } from './CaptionEditorPanel';
 import { AIEditorPanel } from './AIEditorPanel';
+import { AutoEditorPanel } from './AutoEditorPanel';
 import { useVideoChat } from '@/hooks/useVideoChat';
 import { useVideoAnalysis } from '@/hooks/useVideoAnalysis';
 import { useEnhancementWorkflow } from '@/hooks/useEnhancementWorkflow';
+import { useAutoEditor } from '@/hooks/useAutoEditor';
 import type { VideoProject, EditAction, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles } from 'lucide-react';
+import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles, Film } from 'lucide-react';
 import { AnimationWorkflowPanel } from './AnimationWorkflowPanel';
 import { useAnimationWorkflow } from '@/hooks/useAnimationWorkflow';
 import { useBrandPresets } from '@/hooks/useBrandPresets';
@@ -77,6 +79,9 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
 
   // Enhancement workflow (AI Editor)
   const enhancementWorkflow = useEnhancementWorkflow({ projectId: project.id });
+
+  // Auto Editor workflow
+  const autoEditor = useAutoEditor({ projectId: project.id });
 
   // Fetch existing analysis on mount
   useEffect(() => {
@@ -216,7 +221,14 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
               </TabsTrigger>
               <TabsTrigger value="ai-editor" className="gap-1.5 text-xs px-2.5 py-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
-                AI Editor
+                Enhance
+              </TabsTrigger>
+              <TabsTrigger value="auto-edit" className="gap-1.5 text-xs px-2.5 py-1.5">
+                <Film className="w-3.5 h-3.5" />
+                Auto Edit
+                {autoEditor.workflow.status === 'reviewing' && (
+                  <span className="ml-1 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                )}
               </TabsTrigger>
               <TabsTrigger value="settings" className="gap-1.5 text-xs px-2.5 py-1.5">
                 <Settings2 className="w-3.5 h-3.5" />
@@ -293,6 +305,35 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 videoDuration={project.duration || 60}
                 currentTime={currentVideoTime}
                 onSeek={handleSeek}
+              />
+            </TabsContent>
+
+            <TabsContent value="auto-edit" className="flex-1 m-0 min-h-0">
+              <AutoEditorPanel
+                workflow={autoEditor.workflow}
+                hasTranscript={hasTranscription}
+                transcript={analysis?.transcription ? {
+                  fullText: analysis.transcription.fullText,
+                  segments: analysis.transcription.segments
+                } : undefined}
+                videoDuration={project.duration || 60}
+                currentTime={currentVideoTime}
+                platform={project.platform}
+                onAnalyze={autoEditor.analyzeAndGenerateEDL}
+                onToggleSegment={autoEditor.toggleSegmentInclusion}
+                onUpdateSegmentCut={autoEditor.updateSegmentCut}
+                onToggleBRoll={autoEditor.toggleBRoll}
+                onApproveAllBRoll={autoEditor.approveAllBRoll}
+                onToggleZoom={autoEditor.toggleZoom}
+                onUpdateZoom={autoEditor.updateZoom}
+                onEnableAllZooms={autoEditor.enableAllZooms}
+                onNextStep={autoEditor.nextReviewStep}
+                onPrevStep={autoEditor.prevReviewStep}
+                onGoToStep={autoEditor.goToReviewStep}
+                onApplyEdits={autoEditor.applyEdits}
+                onReset={autoEditor.resetWorkflow}
+                onSeek={handleSeek}
+                stats={autoEditor.getStats()}
               />
             </TabsContent>
 
