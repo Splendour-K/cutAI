@@ -165,69 +165,43 @@ export function useVideoAnalysis() {
     try {
       let finalVideoUrl = videoUrl;
 
-      // If we have a file, upload it to storage first to avoid memory issues
-      if (videoFile) {
-        // Check file size - if > 5MB, we need to upload to storage
-        const fileSizeMB = videoFile.size / (1024 * 1024);
+      // Check if we have a valid non-blob URL
+      const hasValidUrl = videoUrl && !videoUrl.startsWith('blob:');
+
+      // If we have a file and no valid URL, upload it to storage
+      if (videoFile && !hasValidUrl) {
+        toast.info('Uploading video for processing...');
         
-        if (fileSizeMB > 5) {
-          toast.info('Uploading video for processing...');
-          
-          // Upload to Supabase storage
-          const fileName = `temp_${projectId}_${Date.now()}.${videoFile.name.split('.').pop()}`;
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('videos')
-            .upload(fileName, videoFile, {
-              cacheControl: '3600',
-              upsert: true
-            });
+        // Generate a unique filename
+        const fileExtension = videoFile.name.split('.').pop() || 'mp4';
+        const fileName = `caption_${projectId}_${Date.now()}.${fileExtension}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('videos')
+          .upload(fileName, videoFile, {
+            cacheControl: '3600',
+            upsert: true
+          });
 
-          if (uploadError) {
-            console.error('Upload error:', uploadError);
-            throw new Error('Failed to upload video for processing');
-          }
-
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('videos')
-            .getPublicUrl(fileName);
-          
-          finalVideoUrl = urlData.publicUrl;
-        } else {
-          // For small files, still try to use URL if available, otherwise use a temp blob URL
-          if (!videoUrl) {
-            // Create a temporary object URL - note this won't work for server-side
-            // We'll need to upload for caption generation
-            toast.info('Uploading video for processing...');
-            
-            const fileName = `temp_${projectId}_${Date.now()}.${videoFile.name.split('.').pop()}`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('videos')
-              .upload(fileName, videoFile, {
-                cacheControl: '3600',
-                upsert: true
-              });
-
-            if (uploadError) {
-              throw new Error('Failed to upload video for processing');
-            }
-
-            const { data: urlData } = supabase.storage
-              .from('videos')
-              .getPublicUrl(fileName);
-            
-            finalVideoUrl = urlData.publicUrl;
-          }
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          throw new Error('Failed to upload video for processing. Please try again.');
         }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('videos')
+          .getPublicUrl(fileName);
+        
+        finalVideoUrl = urlData.publicUrl;
+        console.log('Video uploaded successfully:', finalVideoUrl);
+      } else if (!hasValidUrl && !videoFile) {
+        throw new Error("No video file or valid URL available. Please upload a video first.");
       }
 
-      if (!finalVideoUrl) {
-        throw new Error("Could not get a valid video URL for processing");
-      }
-
-      // For blob URLs, we can't process server-side
-      if (finalVideoUrl.startsWith('blob:')) {
-        throw new Error("Video needs to be uploaded to storage for caption generation. Please save your project first.");
+      // Final check - ensure we have a usable URL
+      if (!finalVideoUrl || finalVideoUrl.startsWith('blob:')) {
+        throw new Error("Could not get a valid video URL for processing.");
       }
 
       const { data, error } = await supabase.functions.invoke('generate-captions', {
