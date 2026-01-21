@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ChatPanel } from './ChatPanel';
 import { VideoPreview } from './VideoPreview';
 import { EditorHeader } from './EditorHeader';
@@ -12,7 +12,7 @@ import { useVideoAnalysis } from '@/hooks/useVideoAnalysis';
 import { useEnhancementWorkflow } from '@/hooks/useEnhancementWorkflow';
 import { useAutoEditor } from '@/hooks/useAutoEditor';
 import { useVideoUpload } from '@/hooks/useVideoUpload';
-import type { VideoProject, EditAction, AspectRatio, CaptionSettings } from '@/types/video';
+import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles, Film } from 'lucide-react';
@@ -84,6 +84,13 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
 
   // Auto Editor workflow
   const autoEditor = useAutoEditor({ projectId: project.id });
+
+  // Auto-enable edit preview when EDL becomes available
+  useEffect(() => {
+    if (autoEditor.workflow.edl && autoEditor.workflow.status === 'reviewing') {
+      setIsPreviewingEdits(true);
+    }
+  }, [autoEditor.workflow.edl, autoEditor.workflow.status]);
 
   // Video upload/delete
   const { deleteProject } = useVideoUpload();
