@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import type { VideoProject } from '@/types/video';
 
 interface EditorHeaderProps {
@@ -51,6 +52,9 @@ export function EditorHeader({ project, onBack, onExport, onDelete, isDeleting =
 
       {/* Right side */}
       <div className="flex items-center gap-2">
+        {/* Theme toggle */}
+        <ThemeToggle />
+        
         {/* Delete button */}
         {onDelete && (
           <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

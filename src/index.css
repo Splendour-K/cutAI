@@ -6,6 +6,65 @@
 
 @layer base {
   :root {
+    /* Light mode palette */
+    --background: 210 20% 98%;
+    --foreground: 220 20% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+
+    /* Vibrant cyan accent */
+    --primary: 185 85% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 15% 92%;
+    --secondary-foreground: 220 20% 20%;
+
+    --muted: 210 15% 92%;
+    --muted-foreground: 215 15% 45%;
+
+    --accent: 185 75% 35%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 15% 85%;
+    --input: 210 15% 90%;
+    --ring: 185 85% 40%;
+
+    --radius: 0.75rem;
+
+    /* Custom colors */
+    --surface: 210 15% 96%;
+    --surface-elevated: 0 0% 100%;
+    --surface-glass: 210 20% 98%;
+    
+    --ai-glow: 185 90% 45%;
+    --ai-surface: 185 50% 92%;
+    
+    --success: 160 70% 40%;
+    --warning: 45 90% 50%;
+    
+    /* Gradients */
+    --gradient-ai: linear-gradient(135deg, hsl(185 85% 40%), hsl(200 80% 45%));
+    --gradient-surface: linear-gradient(180deg, hsl(0 0% 100%), hsl(210 15% 96%));
+    --gradient-glow: radial-gradient(ellipse at center, hsl(185 85% 40% / 0.1), transparent 70%);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 20% 20%;
+    --sidebar-primary: 185 85% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 15% 92%;
+    --sidebar-accent-foreground: 220 20% 20%;
+    --sidebar-border: 210 15% 85%;
+    --sidebar-ring: 185 85% 40%;
+  }
+
+  .dark {
     /* Dark cinematic palette */
     --background: 220 20% 6%;
     --foreground: 210 20% 95%;
@@ -36,8 +95,6 @@
     --input: 220 15% 15%;
     --ring: 185 85% 50%;
 
-    --radius: 0.75rem;
-
     /* Custom colors */
     --surface: 220 18% 8%;
     --surface-elevated: 220 16% 12%;
@@ -62,11 +119,6 @@
     --sidebar-accent-foreground: 210 20% 90%;
     --sidebar-border: 220 15% 18%;
     --sidebar-ring: 185 85% 50%;
-  }
-
-  .dark {
-    --background: 220 20% 6%;
-    --foreground: 210 20% 95%;
   }
 }
 
