@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { Upload, Cloud, Scissors, MessageCircle, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlatformSelector } from '@/components/PlatformSelector';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
 import type { Platform } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
@@ -110,6 +111,7 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
 
         {/* Right side */}
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <Button variant="ghost" size="sm" className="text-muted-foreground">
             <MessageCircle className="w-4 h-4" />
           </Button>
