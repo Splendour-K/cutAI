@@ -13,6 +13,7 @@ import type { VideoAnalysis } from '@/hooks/useVideoAnalysis';
 import type { EditDecisionList } from '@/types/autoEditor';
 import { useVideoZoomPreview } from '@/hooks/useVideoZoomPreview';
 import { useEditedPlayback } from '@/hooks/useEditedPlayback';
+import { useAudioDucking } from '@/hooks/useAudioDucking';
 
 interface VideoPreviewProps {
   project: VideoProject;
@@ -72,6 +73,15 @@ export function VideoPreview({
     edl: edl ?? null,
     currentTime,
     isPreviewEnabled: isPreviewingEdits,
+  });
+
+  // Audio ducking - fades main audio when B-roll is active
+  useAudioDucking({
+    videoRef: videoRef as React.RefObject<HTMLVideoElement>,
+    activeBRoll,
+    isPreviewEnabled: isPreviewingEdits,
+    duckedVolume: 0.15, // 15% volume during B-roll
+    fadeDuration: 300,  // 300ms fade
   });
 
   const platformConfig = PLATFORM_CONFIGS[project.platform];
