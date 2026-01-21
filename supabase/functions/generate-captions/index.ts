@@ -92,9 +92,18 @@ serve(async (req) => {
     }
     
     const videoArrayBuffer = await videoResponse.arrayBuffer();
-    const videoBase64 = btoa(String.fromCharCode(...new Uint8Array(videoArrayBuffer)));
     
     console.log(`Video downloaded: ${(videoArrayBuffer.byteLength / 1024 / 1024).toFixed(2)} MB`);
+
+    // Convert to base64 in chunks to avoid stack overflow
+    const uint8Array = new Uint8Array(videoArrayBuffer);
+    const chunkSize = 32768; // 32KB chunks
+    let videoBase64 = '';
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+      videoBase64 += String.fromCharCode.apply(null, chunk as unknown as number[]);
+    }
+    videoBase64 = btoa(videoBase64);
 
     // Use Lovable AI Gateway with Gemini for transcription
     console.log("Calling Lovable AI for transcription...");
