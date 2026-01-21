@@ -122,10 +122,60 @@ export function useVideoUpload() {
     }
   }, []);
 
+  const deleteProject = useCallback(async (projectId: string, videoUrl?: string): Promise<boolean> => {
+    try {
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        // For demo/unauthenticated users, just return success
+        toast.success('Video removed');
+        return true;
+      }
+
+      // Extract file path from URL if it's a storage URL
+      if (videoUrl && videoUrl.includes('supabase.co/storage')) {
+        const urlParts = videoUrl.split('/videos/');
+        if (urlParts[1]) {
+          const filePath = decodeURIComponent(urlParts[1]);
+          const { error: storageError } = await supabase.storage
+            .from('videos')
+            .remove([filePath]);
+          
+          if (storageError) {
+            console.error('Storage deletion error:', storageError);
+          }
+        }
+      }
+
+      // Delete related records first (edit_history, video_analysis)
+      await supabase.from('edit_history').delete().eq('project_id', projectId);
+      await supabase.from('video_analysis').delete().eq('project_id', projectId);
+
+      // Delete project record
+      const { error: projectError } = await supabase
+        .from('video_projects')
+        .delete()
+        .eq('id', projectId);
+
+      if (projectError) {
+        throw new Error(projectError.message);
+      }
+
+      toast.success('Video deleted successfully');
+      return true;
+    } catch (error) {
+      console.error('Delete failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Delete failed');
+      return false;
+    }
+  }, []);
+
   return {
     isUploading,
     uploadProgress,
     uploadVideo,
     getSignedUrl,
+    deleteProject,
   };
 }

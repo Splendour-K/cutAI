@@ -1,17 +1,44 @@
-import { memo } from 'react';
-import { Film, X } from 'lucide-react';
+import { memo, useRef, useEffect } from 'react';
+import { Film, X, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BRollSuggestion } from '@/types/autoEditor';
 
 interface BRollOverlayProps {
   bRoll: BRollSuggestion;
+  isPlaying?: boolean;
+  currentTime?: number;
   onDismiss?: () => void;
 }
 
 export const BRollOverlay = memo(function BRollOverlay({
   bRoll,
+  isPlaying = true,
+  currentTime = 0,
   onDismiss,
 }: BRollOverlayProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Sync playback with main video
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !bRoll.stockFootageUrl) return;
+
+    // Calculate time within B-roll clip
+    const bRollStartTime = bRoll.timestamp;
+    const timeIntoClip = currentTime - bRollStartTime;
+
+    // Keep video time synced
+    if (Math.abs(video.currentTime - timeIntoClip) > 0.5) {
+      video.currentTime = Math.max(0, timeIntoClip);
+    }
+
+    if (isPlaying && video.paused) {
+      video.play().catch(() => {});
+    } else if (!isPlaying && !video.paused) {
+      video.pause();
+    }
+  }, [isPlaying, currentTime, bRoll.timestamp, bRoll.stockFootageUrl]);
+
   // Determine position classes based on B-roll position setting
   const getPositionClasses = () => {
     switch (bRoll.position) {
@@ -39,19 +66,20 @@ export const BRollOverlay = memo(function BRollOverlay({
   return (
     <div 
       className={cn(
-        "absolute z-20 overflow-hidden",
+        "absolute z-20 overflow-hidden transition-opacity duration-300",
         isPip && "rounded-lg shadow-xl border border-white/20",
         getPositionClasses()
       )}
     >
       {bRoll.stockFootageUrl ? (
-        // Actual stock footage
+        // Actual stock footage - synced playback
         <video
+          ref={videoRef}
           src={bRoll.stockFootageUrl}
           className="w-full h-full object-cover"
-          autoPlay
           muted
           loop
+          playsInline
         />
       ) : (
         // Placeholder when no footage is selected yet
@@ -71,6 +99,14 @@ export const BRollOverlay = memo(function BRollOverlay({
               </p>
             </>
           )}
+        </div>
+      )}
+
+      {/* B-Roll indicator badge */}
+      {bRoll.stockFootageUrl && (
+        <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-sm">
+          <Film className="w-3 h-3 text-white/80" />
+          <span className="text-[10px] text-white/80 font-medium">B-Roll</span>
         </div>
       )}
 

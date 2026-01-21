@@ -201,7 +201,11 @@ export function VideoPreview({
 
         {/* B-Roll Overlay */}
         {isPreviewingEdits && activeBRoll && (
-          <BRollOverlay bRoll={activeBRoll} />
+          <BRollOverlay 
+            bRoll={activeBRoll} 
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+          />
         )}
 
         {/* Excluded Section Overlay */}

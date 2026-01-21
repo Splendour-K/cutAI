@@ -11,6 +11,7 @@ import { useVideoChat } from '@/hooks/useVideoChat';
 import { useVideoAnalysis } from '@/hooks/useVideoAnalysis';
 import { useEnhancementWorkflow } from '@/hooks/useEnhancementWorkflow';
 import { useAutoEditor } from '@/hooks/useAutoEditor';
+import { useVideoUpload } from '@/hooks/useVideoUpload';
 import type { VideoProject, EditAction, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -83,6 +84,22 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
 
   // Auto Editor workflow
   const autoEditor = useAutoEditor({ projectId: project.id });
+
+  // Video upload/delete
+  const { deleteProject } = useVideoUpload();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      const success = await deleteProject(project.id, project.videoUrl);
+      if (success) {
+        onBack();
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [project.id, project.videoUrl, deleteProject, onBack]);
 
   // Fetch existing analysis on mount
   useEffect(() => {
@@ -185,7 +202,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {isAnalyzing && <AnalyzingOverlay onComplete={handleAnalysisComplete} />}
 
-      <EditorHeader project={project} onBack={onBack} onExport={handleExport} />
+      <EditorHeader project={project} onBack={onBack} onExport={handleExport} onDelete={handleDelete} isDeleting={isDeleting} />
 
       <div className="flex-1 flex min-h-0">
         {/* Left Panel - Chat/Analysis */}
