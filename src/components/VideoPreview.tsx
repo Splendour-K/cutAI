@@ -12,6 +12,7 @@ import { PLATFORM_CONFIGS } from '@/types/video';
 import type { VideoAnalysis } from '@/hooks/useVideoAnalysis';
 import type { EditDecisionList } from '@/types/autoEditor';
 import { useVideoZoomPreview } from '@/hooks/useVideoZoomPreview';
+import { useEditedPlayback } from '@/hooks/useEditedPlayback';
 
 interface VideoPreviewProps {
   project: VideoProject;
@@ -55,9 +56,20 @@ export function VideoPreview({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
+  // Edited playback hook - handles skipping excluded sections
+  const editedPlayback = useEditedPlayback({
+    edl: edl ?? null,
+    isPreviewEnabled: isPreviewingEdits,
+    videoRef: videoRef as React.RefObject<HTMLVideoElement>,
+    onTimeUpdate: (editedTime) => {
+      setCurrentTime(editedTime);
+      onTimeUpdate?.(editedTime);
+    },
+  });
+
   // Zoom preview hook
   const { activeZoom, activeBRoll, zoomStyle, isInExcludedSection } = useVideoZoomPreview({
-    edl,
+    edl: edl ?? null,
     currentTime,
     isPreviewEnabled: isPreviewingEdits,
   });
@@ -69,8 +81,12 @@ export function VideoPreview({
     if (!video) return;
 
     const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime);
-      onTimeUpdate?.(video.currentTime);
+      // When editing mode is off, use raw video time
+      if (!isPreviewingEdits || !edl) {
+        setCurrentTime(video.currentTime);
+        onTimeUpdate?.(video.currentTime);
+      }
+      // When editing mode is on, useEditedPlayback handles time updates
     };
     const handleLoadedMetadata = () => setDuration(video.duration);
     const handleEnded = () => setIsPlaying(false);
@@ -84,7 +100,7 @@ export function VideoPreview({
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('ended', handleEnded);
     };
-  }, [onTimeUpdate]);
+  }, [onTimeUpdate, isPreviewingEdits, edl]);
 
   const togglePlay = useCallback(() => {
     if (videoRef.current) {
@@ -105,20 +121,25 @@ export function VideoPreview({
   }, [isMuted]);
 
   const handleSeek = useCallback((time: number) => {
-    if (videoRef.current) {
+    if (isPreviewingEdits && edl) {
+      // Seek in edited timeline
+      editedPlayback.seekToEditedTime(time);
+    } else if (videoRef.current) {
       videoRef.current.currentTime = time;
       setCurrentTime(time);
       onTimeUpdate?.(time);
     }
-  }, [onTimeUpdate]);
+  }, [onTimeUpdate, isPreviewingEdits, edl, editedPlayback]);
 
   const handleRestart = useCallback(() => {
-    if (videoRef.current) {
+    if (isPreviewingEdits && edl) {
+      editedPlayback.seekToEditedTime(0);
+    } else if (videoRef.current) {
       videoRef.current.currentTime = 0;
       setCurrentTime(0);
       onTimeUpdate?.(0);
     }
-  }, [onTimeUpdate]);
+  }, [onTimeUpdate, isPreviewingEdits, edl, editedPlayback]);
 
   const handlePositionChange = useCallback((position: { x: number; y: number }) => {
     onCaptionSettingsChange({ ...captionSettings, customPosition: position });
@@ -151,6 +172,9 @@ export function VideoPreview({
   const isVertical = project.aspectRatio === '9:16';
   const hasAnalysis = analysis?.status === 'completed';
   const hasTranscription = analysis?.transcription && analysis.transcription.segments?.length > 0;
+
+  // Calculate display duration based on edit preview mode
+  const displayDuration = isPreviewingEdits && edl ? edl.editedDuration : duration;
 
   return (
     <div className={cn(
@@ -252,12 +276,12 @@ export function VideoPreview({
                 const rect = e.currentTarget.getBoundingClientRect();
                 const x = e.clientX - rect.left;
                 const percent = x / rect.width;
-                handleSeek(percent * duration);
+                handleSeek(percent * displayDuration);
               }}
             >
               <div 
                 className="h-full bg-primary rounded-full transition-all"
-                style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                style={{ width: `${(currentTime / (displayDuration || 1)) * 100}%` }}
               />
             </div>
 
@@ -289,7 +313,10 @@ export function VideoPreview({
                   {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                 </Button>
                 <span className="text-xs text-foreground/80 font-mono ml-1">
-                  {formatTime(currentTime)} / {formatTime(duration)}
+                  {formatTime(currentTime)} / {formatTime(displayDuration)}
+                  {isPreviewingEdits && edl && (
+                    <span className="text-primary ml-1">(edited)</span>
+                  )}
                 </span>
               </div>
               <div className="flex items-center gap-1">
