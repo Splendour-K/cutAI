@@ -304,23 +304,37 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     });
   }, []);
 
-  // Apply all edits
-  const applyEdits = useCallback(async () => {
-    if (!workflow.edl) return;
+  // Apply all edits - returns the EDL for export processing
+  const applyEdits = useCallback(async (): Promise<EditDecisionList | null> => {
+    if (!workflow.edl) return null;
     
     updateWorkflow({ status: 'applying', progress: 80 });
     
-    // Simulate applying edits (in a real implementation, this would process the video)
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Validate all segments have proper timeline positions
+    const includedSegments = workflow.edl.aRollSegments.filter(s => s.isIncluded);
+    if (includedSegments.length === 0) {
+      toast.error('No segments included in edit');
+      updateWorkflow({ status: 'reviewing', progress: 50 });
+      return null;
+    }
+
+    // Mark EDL as finalized
+    const finalizedEdl: EditDecisionList = {
+      ...workflow.edl,
+      createdAt: new Date().toISOString(),
+    };
     
     updateWorkflow({ 
       status: 'complete', 
       progress: 100,
       reviewStep: 'complete',
       hasUnapprovedChanges: false,
+      edl: finalizedEdl,
     });
     
-    toast.success('All edits applied successfully!');
+    toast.success('Edits finalized! Ready for export.');
+    
+    return finalizedEdl;
   }, [workflow.edl, updateWorkflow]);
 
   // Reset workflow

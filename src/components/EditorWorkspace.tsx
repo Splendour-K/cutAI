@@ -33,6 +33,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const [editedCaptions, setEditedCaptions] = useState<Record<number, string>>({});
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [isPreviewingEdits, setIsPreviewingEdits] = useState(false);
   const [captionSettings, setCaptionSettings] = useState<CaptionSettings>({
     enabled: false,
     style: 'modern',
@@ -506,6 +507,9 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
             isEditingCaptions={isEditingCaptions}
             onTimeUpdate={setCurrentVideoTime}
             onEditCaption={handleEditCaption}
+            edl={autoEditor.workflow.edl}
+            isPreviewingEdits={isPreviewingEdits}
+            onTogglePreviewEdits={() => setIsPreviewingEdits(!isPreviewingEdits)}
           />
         </div>
       </div>

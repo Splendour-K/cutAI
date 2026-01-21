@@ -1,12 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, Captions, Loader2, Sparkles } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize2, RotateCcw, Captions, Loader2, Sparkles, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { VideoTimeline } from './VideoTimeline';
 import { DraggableCaptionOverlay } from './DraggableCaptionOverlay';
+import { ZoomEffectOverlay } from './ZoomEffectOverlay';
+import { BRollOverlay } from './BRollOverlay';
+import { ExcludedSectionOverlay } from './ExcludedSectionOverlay';
 import { cn } from '@/lib/utils';
 import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import type { VideoAnalysis } from '@/hooks/useVideoAnalysis';
+import type { EditDecisionList } from '@/types/autoEditor';
+import { useVideoZoomPreview } from '@/hooks/useVideoZoomPreview';
 
 interface VideoPreviewProps {
   project: VideoProject;
@@ -21,6 +26,9 @@ interface VideoPreviewProps {
   onTimeUpdate?: (time: number) => void;
   onEditCaption?: (index: number, text: string) => void;
   compact?: boolean;
+  edl?: EditDecisionList | null;
+  isPreviewingEdits?: boolean;
+  onTogglePreviewEdits?: () => void;
 }
 
 export function VideoPreview({ 
@@ -35,7 +43,10 @@ export function VideoPreview({
   isEditingCaptions = false,
   onTimeUpdate,
   onEditCaption,
-  compact = false
+  compact = false,
+  edl = null,
+  isPreviewingEdits = false,
+  onTogglePreviewEdits,
 }: VideoPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -43,6 +54,13 @@ export function VideoPreview({
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  // Zoom preview hook
+  const { activeZoom, activeBRoll, zoomStyle, isInExcludedSection } = useVideoZoomPreview({
+    edl,
+    currentTime,
+    isPreviewEnabled: isPreviewingEdits,
+  });
 
   const platformConfig = PLATFORM_CONFIGS[project.platform];
 
@@ -159,13 +177,37 @@ export function VideoPreview({
           isEditingCaptions && "ring-2 ring-primary/30"
         )}
       >
-        {/* Video */}
-        <video
-          ref={videoRef}
-          src={project.videoUrl}
-          className="w-full h-full object-cover"
-          playsInline
-        />
+        {/* Video with zoom effects */}
+        <div 
+          className="w-full h-full overflow-hidden"
+          style={isPreviewingEdits ? zoomStyle : undefined}
+        >
+          <video
+            ref={videoRef}
+            src={project.videoUrl}
+            className="w-full h-full object-cover"
+            playsInline
+          />
+        </div>
+
+        {/* Zoom Effect Overlay */}
+        {isPreviewingEdits && activeZoom.isActive && (
+          <ZoomEffectOverlay
+            isActive={activeZoom.isActive}
+            scale={activeZoom.scale}
+            focalPoint={activeZoom.focalPoint}
+          />
+        )}
+
+        {/* B-Roll Overlay */}
+        {isPreviewingEdits && activeBRoll && (
+          <BRollOverlay bRoll={activeBRoll} />
+        )}
+
+        {/* Excluded Section Overlay */}
+        {isPreviewingEdits && isInExcludedSection && (
+          <ExcludedSectionOverlay />
+        )}
 
         {/* Draggable Caption Overlay */}
         {hasTranscription && (
@@ -247,6 +289,21 @@ export function VideoPreview({
                 </span>
               </div>
               <div className="flex items-center gap-1">
+                {/* Edit Preview Toggle */}
+                {edl && onTogglePreviewEdits && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onTogglePreviewEdits}
+                    className={cn(
+                      "h-7 w-7 hover:bg-foreground/10",
+                      isPreviewingEdits ? "text-primary" : "text-foreground"
+                    )}
+                    title={isPreviewingEdits ? "Hide edit preview" : "Preview edits"}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
