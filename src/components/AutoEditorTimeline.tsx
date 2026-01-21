@@ -1,7 +1,17 @@
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useState, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import type { ARollSegment, BRollSuggestion, ZoomEffect } from '@/types/autoEditor';
+
+// Wrapper component with forwardRef for TooltipTrigger compatibility
+const TimelineBlock = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & { style?: React.CSSProperties }>(
+  ({ className, style, children, ...props }, ref) => (
+    <div ref={ref} className={className} style={style} {...props}>
+      {children}
+    </div>
+  )
+);
+TimelineBlock.displayName = 'TimelineBlock';
 
 interface AutoEditorTimelineProps {
   segments: ARollSegment[];
@@ -93,7 +103,7 @@ export function AutoEditorTimeline({
             {includedSegments.map((seg, index) => (
               <Tooltip key={seg.id}>
                 <TooltipTrigger asChild>
-                  <div
+                  <TimelineBlock
                     className="absolute top-0 h-full bg-primary/80 border-r border-background hover:bg-primary transition-colors"
                     style={{
                       left: `${getPositionPercent(seg.newStartTime)}%`,
@@ -105,7 +115,7 @@ export function AutoEditorTimeline({
                         {index + 1}
                       </span>
                     </div>
-                  </div>
+                  </TimelineBlock>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">
                   <div className="max-w-48">
@@ -123,7 +133,7 @@ export function AutoEditorTimeline({
             {approvedBRoll.map(br => (
               <Tooltip key={br.id}>
                 <TooltipTrigger asChild>
-                  <div
+                  <TimelineBlock
                     className="absolute top-0 h-full bg-blue-500/80 rounded-sm hover:bg-blue-500 transition-colors"
                     style={{
                       left: `${getPositionPercent(br.timestamp)}%`,
@@ -144,7 +154,7 @@ export function AutoEditorTimeline({
             {enabledZooms.map(zoom => (
               <Tooltip key={zoom.id}>
                 <TooltipTrigger asChild>
-                  <div
+                  <TimelineBlock
                     className="absolute top-0 h-full bg-purple-500/60 rounded-sm hover:bg-purple-500/80 transition-colors"
                     style={{
                       left: `${getPositionPercent(zoom.startTime)}%`,
