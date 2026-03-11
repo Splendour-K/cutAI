@@ -184,28 +184,16 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
           </div>
         )}
 
-        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 text-center">
-          What's your next video?
+        <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-3 text-center">
+          Edit videos with AI
         </h1>
         
-        <p className="text-muted-foreground text-center mb-6 max-w-lg">
-          Upload any video and edit it using natural language. Works for {isLongForm ? 'long-form' : 'short-form'} content.
+        <p className="text-muted-foreground text-center mb-8 max-w-md">
+          Upload a video, tell the AI what you want, and export. No editing skills needed.
         </p>
 
         <div className="mb-8">
           <PlatformSelector selected={selectedPlatform} onSelect={setSelectedPlatform} />
-        </div>
-
-        <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-3xl">
-          {currentExamples.map((example) => (
-            <button
-              key={example}
-              onClick={() => setPrompt(example)}
-              className="px-3 py-1.5 text-sm text-muted-foreground bg-card/30 border border-border/30 rounded-full hover:bg-card/50 hover:text-foreground hover:border-primary/40 transition-all duration-200"
-            >
-              {example}
-            </button>
-          ))}
         </div>
 
         <div className="w-full max-w-2xl">
@@ -216,82 +204,61 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder={isLongForm 
-                ? "Create professional captions, add chapter markers, optimize for YouTube..." 
-                : "Remove filler words, add animated captions, make it viral..."}
-              className="w-full min-h-[120px] p-5 bg-transparent text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none text-base leading-relaxed"
+              placeholder="What do you want to do? e.g. 'Add captions and remove filler words'"
+              className="w-full min-h-[100px] p-5 bg-transparent text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none text-base leading-relaxed"
             />
 
             <div className="mx-5 border-t border-border/30" />
 
             <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleUploadClick}
-                  disabled={isUploading}
-                  className="gap-2"
-                >
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {uploadProgress ? `${uploadProgress}%` : 'Uploading...'}
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-4 h-4" />
-                      Upload
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="gap-2"
-                  disabled={isUploading}
-                >
-                  <Cloud className="w-4 h-4" />
-                  Drive
-                </Button>
-              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleUploadClick}
+                disabled={isUploading}
+                className="gap-2"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {uploadProgress ? `${uploadProgress}%` : 'Uploading...'}
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Upload Video
+                  </>
+                )}
+              </Button>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground hidden sm:inline">
-                  {platformConfig.icon} {platformConfig.name} • {platformConfig.aspectRatios[0]}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleDemoClick}
-                  className="gap-2"
-                >
-                  <Scissors className="w-4 h-4" />
-                  Try Demo
-                </Button>
-              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleDemoClick}
+                className="gap-2"
+              >
+                <Scissors className="w-4 h-4" />
+                Try Demo
+              </Button>
             </div>
           </div>
 
-          <div className="mt-6 p-4 rounded-xl bg-card/30 border border-border/20">
-            <p className="text-sm text-muted-foreground text-center">
-              <span className="text-primary">✨ Auto-captions</span> synced word-by-word • <span className="text-primary">Highlighted keywords</span> for emphasis • Modern animated styles • Brand colors & fonts
-            </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            {currentExamples.slice(0, 4).map((example) => (
+              <button
+                key={example}
+                onClick={() => setPrompt(example)}
+                className="px-3 py-1.5 text-xs text-muted-foreground bg-card/30 border border-border/30 rounded-full hover:bg-card/50 hover:text-foreground hover:border-primary/40 transition-all duration-200"
+              >
+                {example}
+              </button>
+            ))}
           </div>
 
-          <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
-            <span>Max duration: {platformConfig.maxDuration >= 3600 
+          <p className="text-center text-xs text-muted-foreground/50 mt-6">
+            Supports MP4, MOV, WebM • Max {platformConfig.maxDuration >= 3600 
               ? `${Math.floor(platformConfig.maxDuration / 3600)}h` 
-              : `${Math.floor(platformConfig.maxDuration / 60)}min`}
-            </span>
-            <span>•</span>
-            <span>Formats: {platformConfig.aspectRatios.join(', ')}</span>
-            <span>•</span>
-            <span>{isLongForm ? 'Long-form content' : 'Short-form content'}</span>
-          </div>
-
-          <p className="text-center text-xs text-muted-foreground/60 mt-4">
-            Public Beta Experimental: AI may produce inaccurate information.
+              : `${Math.floor(platformConfig.maxDuration / 60)}min`} for {platformConfig.name}
           </p>
         </div>
       </main>
