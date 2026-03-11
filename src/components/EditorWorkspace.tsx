@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { ChatPanel } from './ChatPanel';
 import { VideoPreview } from './VideoPreview';
 import { EditorHeader } from './EditorHeader';
