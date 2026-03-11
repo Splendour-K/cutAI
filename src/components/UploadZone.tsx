@@ -114,14 +114,14 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
         {/* Right side */}
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Button variant="ghost" size="sm" className="text-muted-foreground">
-            <MessageCircle className="w-4 h-4" />
+          <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground gap-2">
+            <LogOut className="w-4 h-4" />
+            Sign out
           </Button>
-          <Button variant="outline" size="sm">
-            Upgrade
-          </Button>
-          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-            <span className="text-xs text-muted-foreground">U</span>
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <span className="text-xs font-medium text-primary">
+              {user?.email?.[0]?.toUpperCase() || 'U'}
+            </span>
           </div>
         </div>
       </header>
