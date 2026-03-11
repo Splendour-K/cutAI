@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Upload, Cloud, Scissors, MessageCircle, Sparkles, Loader2, LogOut } from 'lucide-react';
+import { Upload, Scissors, MessageCircle, Sparkles, Loader2, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlatformSelector } from '@/components/PlatformSelector';
 import { ThemeToggle } from '@/components/ThemeToggle';
