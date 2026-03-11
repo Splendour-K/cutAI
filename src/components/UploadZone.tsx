@@ -34,7 +34,7 @@ const EXAMPLE_PROMPTS = {
   ]
 };
 
-export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: UploadZoneProps) {
+const { user, signOut } = useAuth();
   const [prompt, setPrompt] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('instagram');
