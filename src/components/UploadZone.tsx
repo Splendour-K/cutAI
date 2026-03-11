@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
-import { Upload, Cloud, Scissors, MessageCircle, Sparkles, Loader2 } from 'lucide-react';
+import { Upload, Cloud, Scissors, MessageCircle, Sparkles, Loader2, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlatformSelector } from '@/components/PlatformSelector';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/useAuth';
 import type { Platform } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 
