@@ -1,12 +1,16 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Upload, Cloud, Scissors, MessageCircle, Sparkles, Loader2, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PlatformSelector } from '@/components/PlatformSelector';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { AuthModal } from '@/components/AuthModal';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import type { Platform } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
+
+const PENDING_PROMPT_KEY = 'clipzy_pending_prompt';
+const PENDING_PLATFORM_KEY = 'clipzy_pending_platform';
 
 interface UploadZoneProps {
   onUpload: (file: File, platform: Platform, initialPrompt?: string) => void;
@@ -39,10 +43,38 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
   const [prompt, setPrompt] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('instagram');
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Restore pending prompt after login
+  useEffect(() => {
+    if (user) {
+      const pendingPrompt = localStorage.getItem(PENDING_PROMPT_KEY);
+      const pendingPlatform = localStorage.getItem(PENDING_PLATFORM_KEY);
+      if (pendingPrompt) {
+        setPrompt(pendingPrompt);
+        localStorage.removeItem(PENDING_PROMPT_KEY);
+      }
+      if (pendingPlatform) {
+        setSelectedPlatform(pendingPlatform as Platform);
+        localStorage.removeItem(PENDING_PLATFORM_KEY);
+      }
+    }
+  }, [user]);
 
   const platformConfig = PLATFORM_CONFIGS[selectedPlatform];
   const isLongForm = platformConfig.contentType === 'long';
+
+  const requireAuth = useCallback((action: () => void) => {
+    if (!user) {
+      // Store current state before showing auth
+      localStorage.setItem(PENDING_PROMPT_KEY, prompt);
+      localStorage.setItem(PENDING_PLATFORM_KEY, selectedPlatform);
+      setShowAuthModal(true);
+      return;
+    }
+    action();
+  }, [user, prompt, selectedPlatform]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -62,19 +94,23 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
     const videoFile = files.find(f => f.type.startsWith('video/'));
     
     if (videoFile) {
-      onUpload(videoFile, selectedPlatform, prompt || undefined);
+      requireAuth(() => onUpload(videoFile, selectedPlatform, prompt || undefined));
     }
-  }, [onUpload, selectedPlatform, prompt]);
+  }, [onUpload, selectedPlatform, prompt, requireAuth]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files[0]) {
-      onUpload(files[0], selectedPlatform, prompt || undefined);
+      requireAuth(() => onUpload(files[0], selectedPlatform, prompt || undefined));
     }
-  }, [onUpload, selectedPlatform, prompt]);
+  }, [onUpload, selectedPlatform, prompt, requireAuth]);
 
   const handleUploadClick = () => {
-    fileInputRef.current?.click();
+    requireAuth(() => fileInputRef.current?.click());
+  };
+
+  const handleDemoClick = () => {
+    requireAuth(() => onDemo?.(selectedPlatform));
   };
 
   const currentExamples = isLongForm ? EXAMPLE_PROMPTS.long : EXAMPLE_PROMPTS.short;
@@ -86,6 +122,9 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {/* Auth Modal */}
+      <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />
+
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -97,7 +136,6 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
 
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-border/30">
-        {/* Logo */}
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
             <Scissors className="w-4 h-4 text-primary-foreground" />
@@ -105,30 +143,35 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
           <span className="font-semibold text-foreground">Clipzy AI</span>
         </div>
 
-        {/* Center promo (optional) */}
         <div className="hidden md:flex items-center gap-2 text-sm">
           <Sparkles className="w-4 h-4 text-primary" />
           <span className="text-muted-foreground">AI-powered video editing</span>
         </div>
 
-        {/* Right side */}
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground gap-2">
-            <LogOut className="w-4 h-4" />
-            Sign out
-          </Button>
-          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-            <span className="text-xs font-medium text-primary">
-              {user?.email?.[0]?.toUpperCase() || 'U'}
-            </span>
-          </div>
+          {user ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={signOut} className="text-muted-foreground gap-2">
+                <LogOut className="w-4 h-4" />
+                Sign out
+              </Button>
+              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                <span className="text-xs font-medium text-primary">
+                  {user.email?.[0]?.toUpperCase() || 'U'}
+                </span>
+              </div>
+            </>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setShowAuthModal(true)}>
+              Sign in
+            </Button>
+          )}
         </div>
       </header>
 
       {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 pb-24">
-        {/* Drag overlay */}
         {isDragging && (
           <div className="fixed inset-0 z-50 bg-primary/10 border-2 border-dashed border-primary flex items-center justify-center backdrop-blur-sm">
             <div className="text-center space-y-2">
@@ -141,7 +184,6 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
           </div>
         )}
 
-        {/* Title */}
         <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 text-center">
           What's your next video?
         </h1>
@@ -150,12 +192,10 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
           Upload any video and edit it using natural language. Works for {isLongForm ? 'long-form' : 'short-form'} content.
         </p>
 
-        {/* Platform Selector */}
         <div className="mb-8">
           <PlatformSelector selected={selectedPlatform} onSelect={setSelectedPlatform} />
         </div>
 
-        {/* Example Prompts */}
         <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-3xl">
           {currentExamples.map((example) => (
             <button
@@ -168,13 +208,11 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
           ))}
         </div>
 
-        {/* Prompt box */}
         <div className="w-full max-w-2xl">
           <div className={cn(
             "rounded-2xl border border-border/50 bg-card/50 backdrop-blur transition-all duration-300",
             "focus-within:border-primary/50 focus-within:shadow-lg focus-within:shadow-primary/5"
           )}>
-            {/* Textarea */}
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -184,10 +222,8 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
               className="w-full min-h-[120px] p-5 bg-transparent text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-none text-base leading-relaxed"
             />
 
-            {/* Divider */}
             <div className="mx-5 border-t border-border/30" />
 
-            {/* Actions bar */}
             <div className="flex items-center justify-between p-4">
               <div className="flex items-center gap-2">
                 <Button
@@ -227,7 +263,7 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => onDemo?.(selectedPlatform)}
+                  onClick={handleDemoClick}
                   className="gap-2"
                 >
                   <Scissors className="w-4 h-4" />
@@ -237,14 +273,12 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
             </div>
           </div>
 
-          {/* Caption Features Hint */}
           <div className="mt-6 p-4 rounded-xl bg-card/30 border border-border/20">
             <p className="text-sm text-muted-foreground text-center">
               <span className="text-primary">✨ Auto-captions</span> synced word-by-word • <span className="text-primary">Highlighted keywords</span> for emphasis • Modern animated styles • Brand colors & fonts
             </p>
           </div>
 
-          {/* Platform-specific info */}
           <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
             <span>Max duration: {platformConfig.maxDuration >= 3600 
               ? `${Math.floor(platformConfig.maxDuration / 3600)}h` 
@@ -256,14 +290,12 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: Up
             <span>{isLongForm ? 'Long-form content' : 'Short-form content'}</span>
           </div>
 
-          {/* Disclaimer */}
           <p className="text-center text-xs text-muted-foreground/60 mt-4">
             Public Beta Experimental: AI may produce inaccurate information.
           </p>
         </div>
       </main>
 
-      {/* Feedback button */}
       <button className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border/50 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors">
         <MessageCircle className="w-4 h-4" />
         Feedback
