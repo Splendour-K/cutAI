@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { cn } from '@/lib/utils';
 import { ChatPanel } from './ChatPanel';
 import { VideoPreview } from './VideoPreview';
 import { EditorHeader } from './EditorHeader';
@@ -15,12 +16,18 @@ import { useVideoUpload } from '@/hooks/useVideoUpload';
 import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles, Film } from 'lucide-react';
+import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles, Film, ChevronDown } from 'lucide-react';
 import { AnimationWorkflowPanel } from './AnimationWorkflowPanel';
 import { useAnimationWorkflow } from '@/hooks/useAnimationWorkflow';
 import { useBrandPresets } from '@/hooks/useBrandPresets';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface EditorWorkspaceProps {
   project: VideoProject;
@@ -215,50 +222,62 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
         {/* Left Panel - Chat/Analysis */}
         <div className="w-[360px] border-r border-border flex-shrink-0 bg-surface/50 flex flex-col min-h-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-            <TabsList className="w-full justify-start px-3 pt-2 bg-transparent border-b border-border rounded-none h-auto flex-wrap gap-1 flex-shrink-0">
-              <TabsTrigger value="chat" className="gap-1.5 text-xs px-2.5 py-1.5">
+            <TabsList className="w-full justify-start px-3 pt-2 bg-transparent border-b border-border rounded-none h-auto gap-1 flex-shrink-0">
+              <TabsTrigger value="chat" className="gap-1.5 text-xs px-3 py-1.5">
                 <MessageSquare className="w-3.5 h-3.5" />
                 Chat
               </TabsTrigger>
-              <TabsTrigger value="captions" className="gap-1.5 text-xs px-2.5 py-1.5">
+              <TabsTrigger value="captions" className="gap-1.5 text-xs px-3 py-1.5">
                 <Captions className="w-3.5 h-3.5" />
                 Captions
                 {hasTranscription && (
                   <span className="ml-1 w-1.5 h-1.5 rounded-full bg-green-500" />
                 )}
               </TabsTrigger>
-              <TabsTrigger value="analysis" className="gap-1.5 text-xs px-2.5 py-1.5">
-                <Brain className="w-3.5 h-3.5" />
-                Analysis
-              </TabsTrigger>
-              <TabsTrigger value="history" className="gap-1.5 text-xs px-2.5 py-1.5">
-                <History className="w-3.5 h-3.5" />
-                Edits
-                {project.edits.length > 0 && (
-                  <span className="ml-1 px-1 py-0.5 text-[10px] bg-primary/20 text-primary rounded">
-                    {project.edits.filter(e => e.applied).length}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="animate" className="gap-1.5 text-xs px-2.5 py-1.5">
-                <Wand2 className="w-3.5 h-3.5" />
-                Animate
-              </TabsTrigger>
-              <TabsTrigger value="ai-editor" className="gap-1.5 text-xs px-2.5 py-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                Enhance
-              </TabsTrigger>
-              <TabsTrigger value="auto-edit" className="gap-1.5 text-xs px-2.5 py-1.5">
+              <TabsTrigger value="auto-edit" className="gap-1.5 text-xs px-3 py-1.5">
                 <Film className="w-3.5 h-3.5" />
                 Auto Edit
                 {autoEditor.workflow.status === 'reviewing' && (
                   <span className="ml-1 w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                 )}
               </TabsTrigger>
-              <TabsTrigger value="settings" className="gap-1.5 text-xs px-2.5 py-1.5">
-                <Settings2 className="w-3.5 h-3.5" />
-                Format
-              </TabsTrigger>
+
+              {/* More tools dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className={cn(
+                    "inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium transition-colors",
+                    "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    ['analysis', 'history', 'animate', 'ai-editor', 'settings'].includes(activeTab) && "bg-muted text-foreground"
+                  )}>
+                    <Settings2 className="w-3.5 h-3.5" />
+                    More
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-44">
+                  <DropdownMenuItem onClick={() => setActiveTab('analysis')} className="gap-2 text-xs">
+                    <Brain className="w-3.5 h-3.5" /> Analysis
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('ai-editor')} className="gap-2 text-xs">
+                    <Sparkles className="w-3.5 h-3.5" /> Enhance
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('animate')} className="gap-2 text-xs">
+                    <Wand2 className="w-3.5 h-3.5" /> Animate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('history')} className="gap-2 text-xs">
+                    <History className="w-3.5 h-3.5" /> Edit History
+                    {project.edits.length > 0 && (
+                      <span className="ml-auto px-1 py-0.5 text-[10px] bg-primary/20 text-primary rounded">
+                        {project.edits.filter(e => e.applied).length}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('settings')} className="gap-2 text-xs">
+                    <Settings2 className="w-3.5 h-3.5" /> Format
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </TabsList>
             
             <TabsContent value="chat" className="flex-1 m-0 min-h-0">

@@ -76,45 +76,44 @@ export function ChatPanel({ messages, onSendMessage, isProcessing, platform = 'i
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
-          <div className="space-y-6 pt-4">
-            <div className="text-center space-y-2">
-              <p className="text-muted-foreground">
-                Tell me how you'd like to edit your video. I can cut, trim, add captions, and more.
-              </p>
+          <div className="space-y-6 pt-2">
+            {/* Welcome guide */}
+            <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Getting started
+              </h3>
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">1</span>
+                  <span>Tell me what you want — <span className="text-foreground">"add captions"</span> or <span className="text-foreground">"remove filler words"</span></span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">2</span>
+                  <span>Use the <span className="text-foreground">Captions</span> tab to customize styles & fonts</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">3</span>
+                  <span>Try <span className="text-foreground">Auto Edit</span> to let AI handle cuts, B-roll & zooms</span>
+                </div>
+              </div>
             </div>
             
             {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-2">
-              {quickActions.map((action) => (
-                <button
-                  key={action.label}
-                  onClick={() => onSendMessage(action.prompt)}
-                  disabled={isProcessing}
-                  className="flex items-center gap-2 p-3 rounded-xl bg-surface-elevated/50 border border-border/50 hover:border-primary/50 hover:bg-surface-elevated transition-all duration-200 text-left group disabled:opacity-50"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                    <action.icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                  <span className="text-sm font-medium text-foreground">{action.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Example prompts */}
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground text-center">Or try these:</p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {(isLongForm 
-                  ? ['Add subtitles', 'Create timestamps', 'Remove ums']
-                  : ['Make it snappy', 'Add hook', 'Trim to 30s']
-                ).map((prompt) => (
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 font-medium">Quick actions</p>
+              <div className="grid grid-cols-2 gap-2">
+                {quickActions.map((action) => (
                   <button
-                    key={prompt}
-                    onClick={() => onSendMessage(prompt)}
+                    key={action.label}
+                    onClick={() => onSendMessage(action.prompt)}
                     disabled={isProcessing}
-                    className="px-3 py-1 text-xs bg-surface-elevated/30 border border-border/30 rounded-full text-muted-foreground hover:text-foreground hover:border-primary/40 transition-all disabled:opacity-50"
+                    className="flex items-center gap-2 p-3 rounded-xl bg-surface-elevated/50 border border-border/50 hover:border-primary/50 hover:bg-surface-elevated transition-all duration-200 text-left group disabled:opacity-50"
                   >
-                    {prompt}
+                    <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                      <action.icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <span className="text-sm font-medium text-foreground">{action.label}</span>
                   </button>
                 ))}
               </div>
