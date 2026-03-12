@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { saveVideoLocally, generateAndCacheThumbnail } from '@/lib/localVideoStore';
 import type { Platform } from '@/types/video';
 
 interface UploadResult {
@@ -30,6 +31,10 @@ export function useVideoUpload() {
         // For demo purposes, create a temporary project without storage
         const projectId = crypto.randomUUID();
         const videoUrl = URL.createObjectURL(file);
+        
+        // Save locally for persistence
+        await saveVideoLocally(projectId, file).catch(() => {});
+        generateAndCacheThumbnail(projectId, file).catch(() => {});
         
         toast.success('Video loaded for preview');
         setUploadProgress(100);
@@ -92,6 +97,10 @@ export function useVideoUpload() {
 
       setUploadProgress(100);
       toast.success('Video uploaded successfully!');
+
+      // Save locally for offline access
+      await saveVideoLocally(project.id, file).catch(() => {});
+      generateAndCacheThumbnail(project.id, file).catch(() => {});
 
       return {
         projectId: project.id,

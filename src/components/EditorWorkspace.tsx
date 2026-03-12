@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 import { ChatPanel } from './ChatPanel';
 import { VideoPreview } from './VideoPreview';
 import { EditorHeader } from './EditorHeader';
@@ -104,6 +105,21 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   // Video upload/delete
   const { deleteProject } = useVideoUpload();
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Auto-save every 2 minutes
+  const autoSaveRef = useRef<ReturnType<typeof setInterval>>();
+  useEffect(() => {
+    if (project.id === 'demo') return;
+    autoSaveRef.current = setInterval(async () => {
+      try {
+        await supabase
+          .from('video_projects')
+          .update({ updated_at: new Date().toISOString(), status: 'in_progress' })
+          .eq('id', project.id);
+      } catch {}
+    }, 120_000);
+    return () => clearInterval(autoSaveRef.current);
+  }, [project.id]);
 
   const handleDelete = useCallback(async () => {
     setIsDeleting(true);

@@ -1,27 +1,34 @@
 import { useState, useCallback } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { EditorWorkspace } from '@/components/EditorWorkspace';
+import { Dashboard } from '@/components/Dashboard';
 import { useVideoUpload } from '@/hooks/useVideoUpload';
+import { useAuth } from '@/hooks/useAuth';
 import type { VideoProject, Platform, AspectRatio } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 
-// Sample video for demo purposes
 const SAMPLE_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
 
+type View = 'dashboard' | 'upload' | 'editor';
+
 const Index = () => {
+  const { user } = useAuth();
   const [project, setProject] = useState<VideoProject | null>(null);
+  const [view, setView] = useState<View>(user ? 'dashboard' : 'upload');
   const { uploadVideo, isUploading, uploadProgress } = useVideoUpload();
+
+  // Sync view when auth state changes
+  useState(() => {
+    if (user && view === 'upload' && !project) {
+      setView('dashboard');
+    }
+  });
 
   const handleUpload = useCallback(async (file: File, platform: Platform = 'instagram', initialPrompt?: string) => {
     const config = PLATFORM_CONFIGS[platform];
-    
-    // Upload to storage (or create local URL for unauthenticated users)
     const result = await uploadVideo(file, platform);
-    
-    if (!result) {
-      return; // Upload failed, error already shown
-    }
-    
+    if (!result) return;
+
     const newProject: VideoProject = {
       id: result.projectId,
       title: result.fileName.replace(/\.[^/.]+$/, ''),
@@ -36,6 +43,7 @@ const Index = () => {
     };
 
     setProject(newProject);
+    setView('editor');
   }, [uploadVideo]);
 
   const handleDemoMode = useCallback((platform: Platform = 'instagram') => {
@@ -52,6 +60,7 @@ const Index = () => {
       edits: [],
     };
     setProject(demoProject);
+    setView('editor');
   }, []);
 
   const handleBack = useCallback(() => {
@@ -59,13 +68,34 @@ const Index = () => {
       URL.revokeObjectURL(project.videoUrl);
     }
     setProject(null);
-  }, [project]);
+    setView(user ? 'dashboard' : 'upload');
+  }, [project, user]);
 
-  if (project) {
+  if (view === 'editor' && project) {
     return <EditorWorkspace project={project} onBack={handleBack} />;
   }
 
-  return <UploadZone onUpload={handleUpload} onDemo={handleDemoMode} isUploading={isUploading} uploadProgress={uploadProgress} />
+  if (view === 'dashboard' && user) {
+    return (
+      <Dashboard
+        onNewProject={() => setView('upload')}
+        onOpenProject={(p) => {
+          setProject(p);
+          setView('editor');
+        }}
+      />
+    );
+  }
+
+  return (
+    <UploadZone
+      onUpload={handleUpload}
+      onDemo={handleDemoMode}
+      isUploading={isUploading}
+      uploadProgress={uploadProgress}
+      onBackToDashboard={user ? () => setView('dashboard') : undefined}
+    />
+  );
 };
 
 export default Index;
