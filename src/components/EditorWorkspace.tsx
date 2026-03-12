@@ -346,9 +346,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     }, 3000);
   }, []);
 
-  const handleFormatChange = useCallback((ratio: AspectRatio) => {
-    setProject((prev) => ({ ...prev, aspectRatio: ratio }));
-  }, []);
+
+
 
   const handleUndoEdit = useCallback((editId: string) => {
     setProject((prev) => ({
