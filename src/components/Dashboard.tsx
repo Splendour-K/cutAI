@@ -72,8 +72,9 @@ export function Dashboard({ onNewProject, onOpenProject }: DashboardProps) {
         duration: proj.duration_seconds ? Number(proj.duration_seconds) : 0,
         aspectRatio: (proj.aspect_ratio || config.aspectRatios[0]) as AspectRatio,
         platform: proj.platform as Platform,
-        status: 'analyzing',
+        status: (['ready', 'in_progress', 'analyzing', 'processing', 'exporting'].includes(proj.status) ? proj.status : 'ready') as VideoProject['status'],
         edits: [],
+        captions: proj.caption_settings ? (proj.caption_settings as any) : undefined,
       };
       onOpenProject(videoProject);
     },
