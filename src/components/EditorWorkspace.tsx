@@ -196,6 +196,10 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     setProject((prev) => ({ ...prev, status: 'ready' }));
   }, []);
 
+  const handleFormatChange = useCallback((ratio: AspectRatio) => {
+    setProject((prev) => ({ ...prev, aspectRatio: ratio }));
+  }, []);
+
   const handleSendMessage = useCallback(async (content: string) => {
     setProject((prev) => ({ ...prev, status: 'processing' }));
     
