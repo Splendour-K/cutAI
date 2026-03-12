@@ -19,7 +19,7 @@ export function useAudioDucking({
   videoRef,
   activeBRoll,
   isPreviewEnabled,
-  duckedVolume = 0.15,
+  duckedVolume = 1.0,
   fadeDuration = 300,
 }: AudioDuckingConfig) {
   const animationRef = useRef<number | null>(null);

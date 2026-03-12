@@ -1,4 +1,4 @@
-import { forwardRef, memo, useRef, useEffect } from 'react';
+import { forwardRef, memo, useRef, useEffect, useState, useMemo } from 'react';
 import { Film, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BRollSuggestion } from '@/types/autoEditor';
@@ -10,6 +10,8 @@ interface BRollOverlayProps {
   onDismiss?: () => void;
 }
 
+const FADE_DURATION = 0.3; // seconds
+
 const BRollOverlayBase = forwardRef<HTMLDivElement, BRollOverlayProps>(function BRollOverlay(
   {
     bRoll,
@@ -20,6 +22,24 @@ const BRollOverlayBase = forwardRef<HTMLDivElement, BRollOverlayProps>(function 
   ref,
 ) {
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Calculate fade opacity based on proximity to clip boundaries
+  const fadeOpacity = useMemo(() => {
+    const clipStart = bRoll.timestamp;
+    const clipEnd = clipStart + (bRoll.duration || 3);
+    const timeIntoClip = currentTime - clipStart;
+    const timeUntilEnd = clipEnd - currentTime;
+
+    // Fade in during first FADE_DURATION seconds
+    if (timeIntoClip < FADE_DURATION) {
+      return Math.max(0, Math.min(1, timeIntoClip / FADE_DURATION));
+    }
+    // Fade out during last FADE_DURATION seconds
+    if (timeUntilEnd < FADE_DURATION) {
+      return Math.max(0, Math.min(1, timeUntilEnd / FADE_DURATION));
+    }
+    return 1;
+  }, [currentTime, bRoll.timestamp, bRoll.duration]);
 
   // Sync playback with main video
   useEffect(() => {
@@ -69,8 +89,9 @@ const BRollOverlayBase = forwardRef<HTMLDivElement, BRollOverlayProps>(function 
   return (
     <div
       ref={ref}
+      style={{ opacity: fadeOpacity, transition: 'opacity 0.15s ease-out' }}
       className={cn(
-        'absolute z-20 overflow-hidden transition-opacity duration-300',
+        'absolute z-20 overflow-hidden',
         isPip && 'rounded-lg shadow-xl border border-white/20',
         getPositionClasses(),
       )}
