@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { saveVideoLocally, generateAndCacheThumbnail } from '@/lib/localVideoStore';
 import type { Platform } from '@/types/video';
 
 interface UploadResult {
