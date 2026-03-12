@@ -97,14 +97,23 @@ export function AutoEditorPanel({
 }: AutoEditorPanelProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [editingOptions, setEditingOptions] = useState({
-    targetStyle: 'auto' as const,
+  const [editingOptions, setEditingOptions] = useState<{
+    targetStyle: 'fast-paced' | 'moderate' | 'documentary' | 'auto';
+    targetDurationReduction: number;
+    platform: string;
+    preferences: {
+      enableZooms: boolean;
+      enableBRoll: boolean;
+      cutFrequency: 'minimal' | 'moderate' | 'aggressive';
+    };
+  }>({
+    targetStyle: 'auto',
     targetDurationReduction: 20,
     platform,
     preferences: {
       enableZooms: true,
       enableBRoll: true,
-      cutFrequency: 'moderate' as const,
+      cutFrequency: 'moderate',
     },
   });
 
