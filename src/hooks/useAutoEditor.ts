@@ -28,7 +28,22 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     setWorkflow(prev => ({ ...prev, ...updates }));
   }, []);
 
-  // Analyze video and generate EDL
+  // Auto-approve all AI decisions in the EDL
+  const autoApproveAll = useCallback((edl: EditDecisionList): EditDecisionList => {
+    return {
+      ...edl,
+      bRollSuggestions: edl.bRollSuggestions.map(br => ({
+        ...br,
+        status: 'approved' as const,
+      })),
+      zoomEffects: edl.zoomEffects.map(z => ({
+        ...z,
+        isEnabled: true,
+      })),
+    };
+  }, []);
+
+  // Fully autonomous: analyze → auto-approve → complete
   const analyzeAndGenerateEDL = useCallback(async (
     transcript: { fullText: string; segments: TranscriptSegment[] },
     videoDuration: number,
@@ -50,8 +65,10 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     });
 
     try {
-      toast.info('AI is analyzing your video...');
+      toast.info('AI is auto-editing your video...');
       
+      updateWorkflow({ progress: 20 });
+
       const { data, error } = await supabase.functions.invoke('auto-edit-video', {
         body: {
           projectId,
@@ -71,20 +88,31 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      const edl = data.edl as EditDecisionList;
+      updateWorkflow({ progress: 70 });
+
+      const rawEdl = data.edl as EditDecisionList;
       
+      // Auto-approve all AI decisions — no intermediate review
+      const approvedEdl = autoApproveAll(rawEdl);
+      
+      // Finalize immediately
+      const finalizedEdl: EditDecisionList = {
+        ...approvedEdl,
+        createdAt: new Date().toISOString(),
+      };
+
       updateWorkflow({ 
-        status: 'reviewing',
-        progress: 50,
-        edl,
-        reviewStep: 'cuts',
-        hasUnapprovedChanges: true,
+        status: 'complete',
+        progress: 100,
+        edl: finalizedEdl,
+        reviewStep: 'complete',
+        hasUnapprovedChanges: false,
       });
 
-      const reduction = ((edl.originalDuration - edl.editedDuration) / edl.originalDuration * 100).toFixed(0);
-      toast.success(`AI created ${edl.aRollSegments.length} segments. Reduced duration by ${reduction}%`);
+      const reduction = ((finalizedEdl.originalDuration - finalizedEdl.editedDuration) / finalizedEdl.originalDuration * 100).toFixed(0);
+      toast.success(`Auto-edit complete! Reduced by ${reduction}%. Review the summary below.`);
       
-      return edl;
+      return finalizedEdl;
 
     } catch (error) {
       console.error('Auto-edit analysis error:', error);
@@ -96,10 +124,19 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
         progress: 0,
       });
       
-      toast.error(`Analysis failed: ${errorMessage}`);
+      toast.error(`Auto-edit failed: ${errorMessage}`);
       throw error;
     }
-  }, [projectId, updateWorkflow]);
+  }, [projectId, updateWorkflow, autoApproveAll]);
+
+  // Enter review mode to adjust AI decisions after auto-edit
+  const enterReviewMode = useCallback(() => {
+    updateWorkflow({ 
+      status: 'reviewing',
+      reviewStep: 'cuts',
+      hasUnapprovedChanges: false,
+    });
+  }, [updateWorkflow]);
 
   // Toggle segment inclusion
   const toggleSegmentInclusion = useCallback((segmentId: string) => {
@@ -110,7 +147,6 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
         seg.id === segmentId ? { ...seg, isIncluded: !seg.isIncluded } : seg
       );
       
-      // Recalculate timeline positions
       let currentTime = 0;
       const repositionedSegments = updatedSegments.map(seg => {
         if (seg.isIncluded) {
@@ -145,7 +181,6 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
   const updateSegmentCut = useCallback((segmentId: string, cutType: ARollSegment['cutType'], transitionDuration?: number) => {
     setWorkflow(prev => {
       if (!prev.edl) return prev;
-      
       return {
         ...prev,
         edl: {
@@ -163,7 +198,6 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
   const toggleBRoll = useCallback((brollId: string) => {
     setWorkflow(prev => {
       if (!prev.edl) return prev;
-      
       return {
         ...prev,
         edl: {
@@ -183,19 +217,13 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
   const setBRollFootage = useCallback((brollId: string, stockFootageUrl: string, attribution?: string) => {
     setWorkflow(prev => {
       if (!prev.edl) return prev;
-      
       return {
         ...prev,
         edl: {
           ...prev.edl,
           bRollSuggestions: prev.edl.bRollSuggestions.map(br => 
             br.id === brollId 
-              ? { 
-                  ...br, 
-                  stockFootageUrl, 
-                  status: 'ready' as const,
-                  reason: attribution ? `${br.reason} | ${attribution}` : br.reason,
-                }
+              ? { ...br, stockFootageUrl, status: 'ready' as const, reason: attribution ? `${br.reason} | ${attribution}` : br.reason }
               : br
           ),
         },
@@ -208,7 +236,6 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
   const approveAllBRoll = useCallback(() => {
     setWorkflow(prev => {
       if (!prev.edl) return prev;
-      
       return {
         ...prev,
         edl: {
@@ -227,7 +254,6 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
   const toggleZoom = useCallback((zoomId: string) => {
     setWorkflow(prev => {
       if (!prev.edl) return prev;
-      
       return {
         ...prev,
         edl: {
@@ -245,7 +271,6 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
   const updateZoom = useCallback((zoomId: string, updates: Partial<ZoomEffect>) => {
     setWorkflow(prev => {
       if (!prev.edl) return prev;
-      
       return {
         ...prev,
         edl: {
@@ -263,7 +288,6 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
   const enableAllZooms = useCallback(() => {
     setWorkflow(prev => {
       if (!prev.edl) return prev;
-      
       return {
         ...prev,
         edl: {
@@ -285,12 +309,7 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
       const steps: AutoEditorWorkflow['reviewStep'][] = ['cuts', 'broll', 'zooms', 'preview', 'complete'];
       const currentIndex = steps.indexOf(prev.reviewStep);
       const nextStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
-      
-      return {
-        ...prev,
-        reviewStep: nextStep,
-        progress: prev.progress + 10,
-      };
+      return { ...prev, reviewStep: nextStep, progress: prev.progress + 10 };
     });
   }, []);
 
@@ -299,18 +318,16 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
       const steps: AutoEditorWorkflow['reviewStep'][] = ['cuts', 'broll', 'zooms', 'preview', 'complete'];
       const currentIndex = steps.indexOf(prev.reviewStep);
       const prevStep = steps[Math.max(currentIndex - 1, 0)];
-      
       return { ...prev, reviewStep: prevStep };
     });
   }, []);
 
-  // Apply all edits - returns the EDL for export processing
+  // Apply all edits
   const applyEdits = useCallback(async (): Promise<EditDecisionList | null> => {
     if (!workflow.edl) return null;
     
     updateWorkflow({ status: 'applying', progress: 80 });
     
-    // Validate all segments have proper timeline positions
     const includedSegments = workflow.edl.aRollSegments.filter(s => s.isIncluded);
     if (includedSegments.length === 0) {
       toast.error('No segments included in edit');
@@ -318,7 +335,6 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
       return null;
     }
 
-    // Mark EDL as finalized
     const finalizedEdl: EditDecisionList = {
       ...workflow.edl,
       createdAt: new Date().toISOString(),
@@ -333,7 +349,6 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     });
     
     toast.success('Edits finalized! Ready for export.');
-    
     return finalizedEdl;
   }, [workflow.edl, updateWorkflow]);
 
@@ -353,7 +368,7 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     if (!workflow.edl) return null;
     
     const includedSegments = workflow.edl.aRollSegments.filter(s => s.isIncluded);
-    const approvedBRoll = workflow.edl.bRollSuggestions.filter(b => b.status === 'approved');
+    const approvedBRoll = workflow.edl.bRollSuggestions.filter(b => b.status === 'approved' || b.status === 'ready');
     const enabledZooms = workflow.edl.zoomEffects.filter(z => z.isEnabled);
     
     return {
@@ -369,12 +384,14 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
       enabledZooms: enabledZooms.length,
       style: workflow.edl.style,
       pacing: workflow.edl.pacing,
+      editingNotes: workflow.edl.editingNotes,
     };
   }, [workflow.edl]);
 
   return {
     workflow,
     analyzeAndGenerateEDL,
+    enterReviewMode,
     toggleSegmentInclusion,
     updateSegmentCut,
     toggleBRoll,

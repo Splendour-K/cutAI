@@ -389,6 +389,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 onGoToStep={autoEditor.goToReviewStep}
                 onApplyEdits={autoEditor.applyEdits}
                 onReset={autoEditor.resetWorkflow}
+                onEnterReviewMode={autoEditor.enterReviewMode}
                 onSeek={handleSeek}
                 stats={autoEditor.getStats()}
               />
