@@ -9,9 +9,11 @@ interface UseChatOptions {
   platform: Platform;
   contentType: 'short' | 'long';
   analysisContext?: VideoAnalysis | null;
+  videoUrl?: string;
+  videoTitle?: string;
 }
 
-export function useVideoChat({ platform, contentType, analysisContext }: UseChatOptions) {
+export function useVideoChat({ platform, contentType, analysisContext, videoUrl, videoTitle }: UseChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -52,6 +54,8 @@ export function useVideoChat({ platform, contentType, analysisContext }: UseChat
             sceneChanges: analysisContext.sceneChanges,
             suggestedEdits: analysisContext.suggestedEdits,
           } : undefined,
+          videoUrl,
+          videoTitle,
           platform,
           contentType,
         }),
@@ -175,7 +179,7 @@ export function useVideoChat({ platform, contentType, analysisContext }: UseChat
     } finally {
       setIsProcessing(false);
     }
-  }, [messages, analysisContext, platform, contentType]);
+  }, [messages, analysisContext, platform, contentType, videoUrl, videoTitle]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);

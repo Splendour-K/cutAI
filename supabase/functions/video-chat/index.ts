@@ -14,6 +14,8 @@ interface ChatRequest {
     sceneChanges?: any[];
     suggestedEdits?: any[];
   };
+  videoUrl?: string;
+  videoTitle?: string;
   platform?: string;
   contentType?: string;
 }
@@ -29,15 +31,28 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { messages, analysisContext, platform = 'instagram', contentType = 'short' }: ChatRequest = await req.json();
+    const { messages, analysisContext, videoUrl, videoTitle, platform = 'instagram', contentType = 'short' }: ChatRequest = await req.json();
 
     console.log(`Processing chat request with ${messages.length} messages`);
 
-    // Build context from analysis
+    // Build context from analysis and video info
     let contextInfo = '';
+    
+    if (videoUrl) {
+      contextInfo += `\n\n**UPLOADED VIDEO:** The user has uploaded a video titled "${videoTitle || 'Untitled'}". The video URL is: ${videoUrl}`;
+      contextInfo += `\nYou HAVE access to the user's video. Do NOT say you can't see or access their video. The video has been uploaded and analyzed.`;
+    }
+
     if (analysisContext) {
       if (analysisContext.transcription?.fullText) {
         contextInfo += `\n\n**VIDEO TRANSCRIPTION:**\n${analysisContext.transcription.fullText}`;
+        
+        if (analysisContext.transcription.segments?.length > 0) {
+          const segmentsSummary = analysisContext.transcription.segments.slice(0, 20).map((s: any) => 
+            `[${s.startTime?.toFixed(1)}s-${s.endTime?.toFixed(1)}s]: ${s.text}`
+          ).join('\n');
+          contextInfo += `\n\n**TRANSCRIPT SEGMENTS (timed):**\n${segmentsSummary}`;
+        }
       }
       
       if (analysisContext.pauses && analysisContext.pauses.length > 0) {
@@ -64,8 +79,12 @@ serve(async (req) => {
 
     const systemPrompt = `You are an expert AI video editor assistant. You help users edit their videos through natural conversation.
 
+**IMPORTANT:** The user has already uploaded their video to this platform. You CAN see their video and its content through the analysis data provided below. Never say you cannot see or access the video. Always reference the video content based on the transcription and analysis provided.
+
 **YOUR ROLE:**
-- Analyze user requests and suggest specific video edits
+- You have analyzed the user's uploaded video
+- Reference specific content from the transcript when suggesting edits
+- Be proactive: suggest specific improvements based on what you see in the video
 - Explain what changes you're making and why
 - Be concise but informative
 - Always respond with actionable edits when the user requests changes

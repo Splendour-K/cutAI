@@ -74,6 +74,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     platform: project.platform,
     contentType,
     analysisContext: analysis,
+    videoUrl: project.videoUrl,
+    videoTitle: project.title,
   });
 
   // Animation workflow
@@ -115,12 +117,20 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     }
   }, [project.id, project.videoUrl, deleteProject, onBack]);
 
-  // Fetch existing analysis on mount
+  // Fetch existing analysis on mount, auto-generate captions if none exist
   useEffect(() => {
     if (project.id) {
-      fetchAnalysis(project.id);
+      fetchAnalysis(project.id).then((existingAnalysis) => {
+        // Auto-generate captions if no transcription exists yet
+        const hasExistingTranscription = existingAnalysis?.transcription && 
+          (existingAnalysis.transcription as any)?.segments?.length > 0;
+        if (!hasExistingTranscription && project.videoUrl) {
+          const skipPersistence = project.videoUrl.startsWith('blob:') ? true : false;
+          generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+        }
+      });
     }
-  }, [project.id, fetchAnalysis]);
+  }, [project.id, fetchAnalysis, generateCaptions, project.videoFile, project.videoUrl]);
 
   const handleAnalysisComplete = useCallback(() => {
     setIsAnalyzing(false);
@@ -286,6 +296,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 onSendMessage={handleSendMessage}
                 isProcessing={isProcessing}
                 platform={project.platform}
+                isAnalyzingVideo={isGeneratingCaptions || isRunningAnalysis}
+                hasAnalysis={!!analysis?.transcription}
               />
             </TabsContent>
 
