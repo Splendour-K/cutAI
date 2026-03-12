@@ -44,7 +44,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [isPreviewingEdits, setIsPreviewingEdits] = useState(false);
-  const [captionSettings, setCaptionSettings] = useState<CaptionSettings>({
+  const defaultCaptionSettings: CaptionSettings = {
     enabled: false,
     style: 'modern',
     animation: 'none',
@@ -54,7 +54,10 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     fontSize: 'medium',
     textColor: 'hsl(0, 0%, 100%)',
     brandColor: 'hsl(45, 100%, 55%)'
-  });
+  };
+  const [captionSettings, setCaptionSettings] = useState<CaptionSettings>(
+    initialProject.captions || defaultCaptionSettings
+  );
   
   const platformConfig = PLATFORM_CONFIGS[project.platform];
   const contentType = platformConfig.contentType;
