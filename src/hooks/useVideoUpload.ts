@@ -32,6 +32,10 @@ export function useVideoUpload() {
         const projectId = crypto.randomUUID();
         const videoUrl = URL.createObjectURL(file);
         
+        // Save locally for persistence
+        await saveVideoLocally(projectId, file).catch(() => {});
+        generateAndCacheThumbnail(projectId, file).catch(() => {});
+        
         toast.success('Video loaded for preview');
         setUploadProgress(100);
         
