@@ -236,7 +236,48 @@ export function Dashboard({ onNewProject, onOpenProject }: DashboardProps) {
                 {/* Info */}
                 <div className="p-3">
                   <div className="flex items-start justify-between gap-2 mb-1">
-                    <h3 className="font-medium text-sm text-foreground truncate">{proj.title}</h3>
+                    {editingId === proj.id ? (
+                      <form
+                        className="flex items-center gap-1 flex-1 min-w-0"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const trimmed = editingTitle.trim();
+                          if (trimmed && trimmed !== proj.title) {
+                            renameProject(proj.id, trimmed);
+                          }
+                          setEditingId(null);
+                        }}
+                      >
+                        <input
+                          autoFocus
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') setEditingId(null);
+                          }}
+                          className="flex-1 min-w-0 text-sm font-medium bg-transparent border-b border-primary text-foreground focus:outline-none"
+                        />
+                        <button type="submit" onClick={(e) => e.stopPropagation()} className="text-primary hover:text-primary/80">
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setEditingId(null); }} className="text-muted-foreground hover:text-foreground">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </form>
+                    ) : (
+                      <h3
+                        className="font-medium text-sm text-foreground truncate cursor-text hover:text-primary transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingId(proj.id);
+                          setEditingTitle(proj.title);
+                        }}
+                        title="Click to rename"
+                      >
+                        {proj.title}
+                      </h3>
+                    )}
                     <Badge variant="secondary" className="text-[10px] shrink-0">
                       {proj.platform}
                     </Badge>
