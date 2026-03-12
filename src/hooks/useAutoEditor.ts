@@ -386,6 +386,149 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     return finalizedEdl;
   }, [workflow.edl, updateWorkflow]);
 
+  // Create a baseline EDL from transcript segments (for chat actions before auto-editor runs)
+  const createEDLFromSegments = useCallback((
+    segments: TranscriptSegment[],
+    videoDuration: number
+  ): EditDecisionList => {
+    const aRollSegments: ARollSegment[] = segments.map((seg, i) => ({
+      id: `seg-${i}`,
+      originalStartTime: seg.startTime,
+      originalEndTime: seg.endTime,
+      newStartTime: seg.startTime,
+      newEndTime: seg.endTime,
+      duration: seg.endTime - seg.startTime,
+      content: seg.text,
+      isIncluded: true,
+      cutType: 'hard' as const,
+    }));
+
+    const edl: EditDecisionList = {
+      projectId,
+      createdAt: new Date().toISOString(),
+      originalDuration: videoDuration,
+      editedDuration: videoDuration,
+      aRollSegments,
+      removedSections: [],
+      bRollSuggestions: [],
+      zoomEffects: [],
+      pacing: {
+        averageSegmentDuration: videoDuration / Math.max(segments.length, 1),
+        suggestedCutFrequency: 0,
+        energyLevel: 'medium',
+        rhythmPattern: 'natural',
+        hooks: [],
+        slowSections: [],
+      },
+      style: 'vlog',
+      editingNotes: ['Baseline EDL created from transcript for chat editing'],
+    };
+
+    setWorkflow(prev => ({
+      ...prev,
+      status: 'complete',
+      progress: 100,
+      edl,
+      reviewStep: 'complete',
+      hasUnapprovedChanges: false,
+    }));
+
+    return edl;
+  }, [projectId]);
+
+  // Exclude a time range from the EDL (marks overlapping segments as excluded)
+  const excludeTimeRange = useCallback((startTime: number, endTime: number) => {
+    setWorkflow(prev => {
+      if (!prev.edl) return prev;
+
+      const updatedSegments = prev.edl.aRollSegments.map(seg => {
+        const overlaps = seg.originalStartTime < endTime && seg.originalEndTime > startTime;
+        if (overlaps) {
+          return { ...seg, isIncluded: false, reason: `Excluded ${startTime.toFixed(1)}s–${endTime.toFixed(1)}s` };
+        }
+        return seg;
+      });
+
+      // Recalculate edited duration
+      let currentTime = 0;
+      const repositioned = updatedSegments.map(seg => {
+        if (seg.isIncluded) {
+          const newSeg = { ...seg, newStartTime: currentTime, newEndTime: currentTime + seg.duration };
+          currentTime += seg.duration + (seg.transitionDuration || 0);
+          return newSeg;
+        }
+        return seg;
+      });
+
+      const editedDuration = repositioned.filter(s => s.isIncluded).reduce((t, s) => t + s.duration, 0);
+
+      return {
+        ...prev,
+        edl: {
+          ...prev.edl,
+          aRollSegments: repositioned,
+          editedDuration,
+          removedSections: [
+            ...prev.edl.removedSections,
+            { startTime, endTime, reason: 'chat-requested cut' },
+          ],
+        },
+        hasUnapprovedChanges: true,
+      };
+    });
+  }, []);
+
+  // Add a zoom effect to the EDL
+  const addZoomEffect = useCallback((
+    startTime: number,
+    endTime: number,
+    zoomType: ZoomEffect['type'] = 'slow-zoom-in',
+    focalPoint?: { x: number; y: number }
+  ) => {
+    setWorkflow(prev => {
+      if (!prev.edl) return prev;
+
+      // Find matching segment
+      const segmentId = prev.edl.aRollSegments.find(
+        s => s.originalStartTime <= startTime && s.originalEndTime >= endTime
+      )?.id || prev.edl.aRollSegments[0]?.id || 'unknown';
+
+      const presets: Record<string, { startScale: number; endScale: number; easing: ZoomEffect['easing'] }> = {
+        'slow-zoom-in': { startScale: 1.0, endScale: 1.15, easing: 'ease-in-out' },
+        'slow-zoom-out': { startScale: 1.15, endScale: 1.0, easing: 'ease-in-out' },
+        'quick-punch': { startScale: 1.0, endScale: 1.3, easing: 'ease-out' },
+        'ken-burns': { startScale: 1.0, endScale: 1.2, easing: 'linear' },
+        'focus-shift': { startScale: 1.0, endScale: 1.1, easing: 'ease-in-out' },
+      };
+
+      const preset = presets[zoomType] || presets['slow-zoom-in'];
+
+      const newZoom: ZoomEffect = {
+        id: `zoom-chat-${Date.now()}`,
+        segmentId,
+        startTime,
+        endTime,
+        duration: endTime - startTime,
+        type: zoomType,
+        startScale: preset.startScale,
+        endScale: preset.endScale,
+        focalPoint: focalPoint || { x: 50, y: 50 },
+        reason: 'Added via chat',
+        isEnabled: true,
+        easing: preset.easing,
+      };
+
+      return {
+        ...prev,
+        edl: {
+          ...prev.edl,
+          zoomEffects: [...prev.edl.zoomEffects, newZoom],
+        },
+        hasUnapprovedChanges: true,
+      };
+    });
+  }, []);
+
   // Reset workflow
   const resetWorkflow = useCallback(() => {
     setWorkflow({
@@ -440,5 +583,8 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     applyEdits,
     resetWorkflow,
     getStats,
+    createEDLFromSegments,
+    excludeTimeRange,
+    addZoomEffect,
   };
 }
