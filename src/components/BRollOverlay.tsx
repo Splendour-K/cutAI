@@ -88,10 +88,10 @@ const BRollOverlayBase = forwardRef<HTMLDivElement, BRollOverlayProps>(function 
       ) : (
         // Placeholder when no footage is selected yet
         <div className={cn('w-full h-full flex flex-col items-center justify-center', 'bg-gradient-to-br from-primary/20 to-primary/40 backdrop-blur-sm')}>
-          <Film className={cn('text-white/80 mb-2', isFullscreen ? 'w-12 h-12' : 'w-6 h-6')} />
+          <Loader2 className={cn('text-white/80 mb-2 animate-spin', isFullscreen ? 'w-10 h-10' : 'w-5 h-5')} />
           {isFullscreen && (
             <>
-              <p className="text-white/90 text-sm font-medium">B-Roll Suggestion</p>
+              <p className="text-white/90 text-sm font-medium">Loading B-Roll...</p>
               <p className="text-white/60 text-xs mt-1 px-4 text-center">{bRoll.description}</p>
             </>
           )}
