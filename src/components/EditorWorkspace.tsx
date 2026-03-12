@@ -138,12 +138,23 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   useEffect(() => {
     if (project.id) {
       fetchAnalysis(project.id).then((existingAnalysis) => {
-        // Auto-generate captions if no transcription exists yet
         const hasExistingTranscription = existingAnalysis?.transcription && 
           (existingAnalysis.transcription as any)?.segments?.length > 0;
-        if (!hasExistingTranscription && project.videoUrl) {
+        const isCompleted = existingAnalysis?.analysis_status === 'completed';
+        
+        if (hasExistingTranscription && isCompleted) {
+          // Analysis already done — skip overlay and don't re-process
+          setHasCheckedExisting(true);
+          setIsAnalyzing(false);
+        } else if (!hasExistingTranscription && project.videoUrl) {
+          // No existing analysis — show overlay and generate
+          setIsAnalyzing(true);
+          setHasCheckedExisting(true);
           const skipPersistence = project.videoUrl.startsWith('blob:') ? true : false;
           generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+        } else {
+          setHasCheckedExisting(true);
+          setIsAnalyzing(false);
         }
       });
     }
