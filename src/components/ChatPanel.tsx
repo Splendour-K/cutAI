@@ -9,6 +9,8 @@ interface ChatPanelProps {
   onSendMessage: (message: string) => void;
   isProcessing: boolean;
   platform?: Platform;
+  isAnalyzingVideo?: boolean;
+  hasAnalysis?: boolean;
 }
 
 const quickActionsShort = [
