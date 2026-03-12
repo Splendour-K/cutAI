@@ -138,6 +138,11 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress, onBa
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-border/30">
         <div className="flex items-center gap-2">
+          {onBackToDashboard && (
+            <Button variant="ghost" size="sm" onClick={onBackToDashboard} className="mr-2 text-muted-foreground">
+              ← Dashboard
+            </Button>
+          )}
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
             <Scissors className="w-4 h-4 text-primary-foreground" />
           </div>
