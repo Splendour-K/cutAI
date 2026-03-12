@@ -17,6 +17,7 @@ interface UploadZoneProps {
   onDemo?: (platform: Platform) => void;
   isUploading?: boolean;
   uploadProgress?: number;
+  onBackToDashboard?: () => void;
 }
 
 const EXAMPLE_PROMPTS = {
