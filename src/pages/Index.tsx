@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { EditorWorkspace } from '@/components/EditorWorkspace';
 import { Dashboard } from '@/components/Dashboard';

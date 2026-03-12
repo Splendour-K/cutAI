@@ -106,6 +106,7 @@ export function Dashboard({ onNewProject, onOpenProject }: DashboardProps) {
         platform: proj.platform as Platform,
         status: 'analyzing',
         edits: [],
+        captions: proj.caption_settings ? (proj.caption_settings as any) : undefined,
       };
       onOpenProject(videoProject);
     },
