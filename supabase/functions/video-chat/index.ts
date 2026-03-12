@@ -14,6 +14,8 @@ interface ChatRequest {
     sceneChanges?: any[];
     suggestedEdits?: any[];
   };
+  videoUrl?: string;
+  videoTitle?: string;
   platform?: string;
   contentType?: string;
 }
