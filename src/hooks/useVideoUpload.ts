@@ -98,6 +98,10 @@ export function useVideoUpload() {
       setUploadProgress(100);
       toast.success('Video uploaded successfully!');
 
+      // Save locally for offline access
+      await saveVideoLocally(project.id, file).catch(() => {});
+      generateAndCacheThumbnail(project.id, file).catch(() => {});
+
       return {
         projectId: project.id,
         videoUrl: publicUrl,
