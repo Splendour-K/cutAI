@@ -416,7 +416,8 @@ export function AutoEditorPanel({
           <span className="text-xs font-medium text-muted-foreground">Adjusting AI Edits</span>
           <div className="flex gap-1">
             <Button variant="ghost" size="sm" onClick={() => {
-              updateWorkflow({ status: 'complete', reviewStep: 'complete' });
+              onGoToStep('complete' as any);
+              onApplyEdits();
             }} className="h-6 px-2 text-xs">
               Done
             </Button>
