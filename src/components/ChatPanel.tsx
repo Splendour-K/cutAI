@@ -31,7 +31,7 @@ const quickActionsLong = [
   { icon: Zap, label: 'Intro/Outro', prompt: 'Add professional intro and outro with call-to-action' },
 ];
 
-export function ChatPanel({ messages, onSendMessage, isProcessing, platform = 'instagram' }: ChatPanelProps) {
+export function ChatPanel({ messages, onSendMessage, isProcessing, platform = 'instagram', isAnalyzingVideo = false, hasAnalysis = false }: ChatPanelProps) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
