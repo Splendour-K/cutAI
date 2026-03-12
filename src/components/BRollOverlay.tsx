@@ -89,8 +89,9 @@ const BRollOverlayBase = forwardRef<HTMLDivElement, BRollOverlayProps>(function 
   return (
     <div
       ref={ref}
+      style={{ opacity: fadeOpacity, transition: 'opacity 0.15s ease-out' }}
       className={cn(
-        'absolute z-20 overflow-hidden transition-opacity duration-300',
+        'absolute z-20 overflow-hidden',
         isPip && 'rounded-lg shadow-xl border border-white/20',
         getPositionClasses(),
       )}
