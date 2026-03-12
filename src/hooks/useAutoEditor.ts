@@ -94,10 +94,44 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
       
       // Auto-approve all AI decisions — no intermediate review
       const approvedEdl = autoApproveAll(rawEdl);
-      
+
+      // Auto-fetch stock footage for each approved B-roll suggestion
+      updateWorkflow({ progress: 75 });
+      toast.info('Fetching stock footage for B-roll...');
+
+      const bRollWithFootage = await Promise.allSettled(
+        approvedEdl.bRollSuggestions.map(async (br) => {
+          if (!br.searchQuery) return { ...br, status: 'rejected' as const };
+          try {
+            const { data: searchData, error: searchError } = await supabase.functions.invoke('search-stock-footage', {
+              body: { query: br.searchQuery, page: 1, perPage: 1, orientation: 'landscape' },
+            });
+            if (searchError || !searchData?.videos?.length) {
+              return { ...br, status: 'rejected' as const };
+            }
+            const video = searchData.videos[0];
+            return {
+              ...br,
+              stockFootageUrl: video.previewUrl || video.downloadUrl,
+              status: 'ready' as const,
+              reason: video.attribution ? `${br.reason} | ${video.attribution}` : br.reason,
+            };
+          } catch {
+            return { ...br, status: 'rejected' as const };
+          }
+        })
+      );
+
+      const resolvedBRoll = bRollWithFootage.map(result =>
+        result.status === 'fulfilled' ? result.value : { ...approvedEdl.bRollSuggestions[0], status: 'rejected' as const }
+      ).filter(br => br.status === 'ready');
+
+      updateWorkflow({ progress: 90 });
+
       // Finalize immediately
       const finalizedEdl: EditDecisionList = {
         ...approvedEdl,
+        bRollSuggestions: resolvedBRoll,
         createdAt: new Date().toISOString(),
       };
 

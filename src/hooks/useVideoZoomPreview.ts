@@ -64,7 +64,7 @@ export function useVideoZoomPreview({ edl, currentTime, isPreviewEnabled }: Vide
     if (!edl) return null;
 
     const approvedBRoll = edl.bRollSuggestions.filter(
-      b => b.status === 'approved' || b.status === 'ready'
+      b => b.status === 'ready' && b.stockFootageUrl
     );
     
     return approvedBRoll.find(b => {
