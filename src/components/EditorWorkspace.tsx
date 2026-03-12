@@ -294,6 +294,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 onSendMessage={handleSendMessage}
                 isProcessing={isProcessing}
                 platform={project.platform}
+                isAnalyzingVideo={isGeneratingCaptions || isRunningAnalysis}
+                hasAnalysis={!!analysis?.transcription}
               />
             </TabsContent>
 

@@ -179,7 +179,7 @@ export function useVideoChat({ platform, contentType, analysisContext, videoUrl,
     } finally {
       setIsProcessing(false);
     }
-  }, [messages, analysisContext, platform, contentType]);
+  }, [messages, analysisContext, platform, contentType, videoUrl, videoTitle]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);
