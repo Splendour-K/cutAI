@@ -77,6 +77,30 @@ export function ChatPanel({ messages, onSendMessage, isProcessing, platform = 'i
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Video analysis status banner */}
+        {isAnalyzingVideo && (
+          <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-3 animate-slide-up">
+            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-foreground">Analyzing your video...</p>
+              <p className="text-[11px] text-muted-foreground">Generating transcript so AI can understand your content</p>
+            </div>
+          </div>
+        )}
+        {!isAnalyzingVideo && hasAnalysis && messages.length === 0 && (
+          <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center gap-3 animate-slide-up">
+            <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-green-500" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-foreground">Video analyzed ✓</p>
+              <p className="text-[11px] text-muted-foreground">AI can now see and understand your video content</p>
+            </div>
+          </div>
+        )}
+
         {messages.length === 0 ? (
           <div className="space-y-6 pt-2">
             {/* Welcome guide */}
