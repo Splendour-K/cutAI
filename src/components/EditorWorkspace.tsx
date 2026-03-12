@@ -74,6 +74,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     platform: project.platform,
     contentType,
     analysisContext: analysis,
+    videoUrl: project.videoUrl,
+    videoTitle: project.title,
   });
 
   // Animation workflow
