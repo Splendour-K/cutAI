@@ -1,5 +1,5 @@
 import { forwardRef, memo, useRef, useEffect } from 'react';
-import { Film, X } from 'lucide-react';
+import { Film, X, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BRollSuggestion } from '@/types/autoEditor';
 
