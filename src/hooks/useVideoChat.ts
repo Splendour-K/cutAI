@@ -13,7 +13,7 @@ interface UseChatOptions {
   videoTitle?: string;
 }
 
-export function useVideoChat({ platform, contentType, analysisContext }: UseChatOptions) {
+export function useVideoChat({ platform, contentType, analysisContext, videoUrl, videoTitle }: UseChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
