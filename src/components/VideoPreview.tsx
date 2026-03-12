@@ -58,7 +58,7 @@ export function VideoPreview({
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [bRollDuckingLevel, setBRollDuckingLevel] = useState(15); // 0-100 percentage
+  const [bRollDuckingLevel, setBRollDuckingLevel] = useState(100); // 0-100 percentage, 100 = no ducking
 
   // Edited playback hook - handles skipping excluded sections
   const editedPlayback = useEditedPlayback({
