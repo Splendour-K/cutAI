@@ -1,5 +1,5 @@
-import { memo, useRef, useEffect } from 'react';
-import { Film, X, Volume2 } from 'lucide-react';
+import { forwardRef, memo, useRef, useEffect } from 'react';
+import { Film, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BRollSuggestion } from '@/types/autoEditor';
 
@@ -10,12 +10,15 @@ interface BRollOverlayProps {
   onDismiss?: () => void;
 }
 
-export const BRollOverlay = memo(function BRollOverlay({
-  bRoll,
-  isPlaying = true,
-  currentTime = 0,
-  onDismiss,
-}: BRollOverlayProps) {
+const BRollOverlayBase = forwardRef<HTMLDivElement, BRollOverlayProps>(function BRollOverlay(
+  {
+    bRoll,
+    isPlaying = true,
+    currentTime = 0,
+    onDismiss,
+  }: BRollOverlayProps,
+  ref,
+) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Sync playback with main video
@@ -64,11 +67,12 @@ export const BRollOverlay = memo(function BRollOverlay({
   const isPip = bRoll.position?.startsWith('pip-');
 
   return (
-    <div 
+    <div
+      ref={ref}
       className={cn(
-        "absolute z-20 overflow-hidden transition-opacity duration-300",
-        isPip && "rounded-lg shadow-xl border border-white/20",
-        getPositionClasses()
+        'absolute z-20 overflow-hidden transition-opacity duration-300',
+        isPip && 'rounded-lg shadow-xl border border-white/20',
+        getPositionClasses(),
       )}
     >
       {bRoll.stockFootageUrl ? (
@@ -83,20 +87,12 @@ export const BRollOverlay = memo(function BRollOverlay({
         />
       ) : (
         // Placeholder when no footage is selected yet
-        <div className={cn(
-          "w-full h-full flex flex-col items-center justify-center",
-          "bg-gradient-to-br from-primary/20 to-primary/40 backdrop-blur-sm"
-        )}>
-          <Film className={cn(
-            "text-white/80 mb-2",
-            isFullscreen ? "w-12 h-12" : "w-6 h-6"
-          )} />
+        <div className={cn('w-full h-full flex flex-col items-center justify-center', 'bg-gradient-to-br from-primary/20 to-primary/40 backdrop-blur-sm')}>
+          <Film className={cn('text-white/80 mb-2', isFullscreen ? 'w-12 h-12' : 'w-6 h-6')} />
           {isFullscreen && (
             <>
               <p className="text-white/90 text-sm font-medium">B-Roll Suggestion</p>
-              <p className="text-white/60 text-xs mt-1 px-4 text-center">
-                {bRoll.description}
-              </p>
+              <p className="text-white/60 text-xs mt-1 px-4 text-center">{bRoll.description}</p>
             </>
           )}
         </div>
@@ -129,3 +125,9 @@ export const BRollOverlay = memo(function BRollOverlay({
     </div>
   );
 });
+
+BRollOverlayBase.displayName = 'BRollOverlay';
+
+export const BRollOverlay = memo(BRollOverlayBase);
+BRollOverlay.displayName = 'BRollOverlay';
+
