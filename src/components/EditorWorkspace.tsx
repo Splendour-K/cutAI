@@ -106,6 +106,21 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const { deleteProject } = useVideoUpload();
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Auto-save every 2 minutes
+  const autoSaveRef = useRef<ReturnType<typeof setInterval>>();
+  useEffect(() => {
+    if (project.id === 'demo') return;
+    autoSaveRef.current = setInterval(async () => {
+      try {
+        await supabase
+          .from('video_projects')
+          .update({ updated_at: new Date().toISOString(), status: 'in_progress' })
+          .eq('id', project.id);
+      } catch {}
+    }, 120_000);
+    return () => clearInterval(autoSaveRef.current);
+  }, [project.id]);
+
   const handleDelete = useCallback(async () => {
     setIsDeleting(true);
     try {
