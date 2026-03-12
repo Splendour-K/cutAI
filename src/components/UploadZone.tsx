@@ -39,7 +39,7 @@ const EXAMPLE_PROMPTS = {
   ]
 };
 
-export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress }: UploadZoneProps) {
+export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress, onBackToDashboard }: UploadZoneProps) {
   const { user, signOut } = useAuth();
   const [prompt, setPrompt] = useState('');
   const [isDragging, setIsDragging] = useState(false);
