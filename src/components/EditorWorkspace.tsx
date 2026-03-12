@@ -37,7 +37,8 @@ interface EditorWorkspaceProps {
 
 export function EditorWorkspace({ project: initialProject, onBack }: EditorWorkspaceProps) {
   const [project, setProject] = useState<VideoProject>(initialProject);
-  const [isAnalyzing, setIsAnalyzing] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [hasCheckedExisting, setHasCheckedExisting] = useState(false);
   const [activeTab, setActiveTab] = useState('chat');
   const [editedCaptions, setEditedCaptions] = useState<Record<number, string>>({});
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
