@@ -9,6 +9,8 @@ interface UseChatOptions {
   platform: Platform;
   contentType: 'short' | 'long';
   analysisContext?: VideoAnalysis | null;
+  videoUrl?: string;
+  videoTitle?: string;
 }
 
 export function useVideoChat({ platform, contentType, analysisContext }: UseChatOptions) {
