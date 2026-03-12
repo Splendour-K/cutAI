@@ -31,7 +31,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { messages, analysisContext, platform = 'instagram', contentType = 'short' }: ChatRequest = await req.json();
+    const { messages, analysisContext, videoUrl, videoTitle, platform = 'instagram', contentType = 'short' }: ChatRequest = await req.json();
 
     console.log(`Processing chat request with ${messages.length} messages`);
 
