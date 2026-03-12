@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import {
   Plus, Search, SortAsc, Clock, Trash2, Copy, Play,
-  Scissors, LogOut, Upload, AlertTriangle, Film, Loader2,
+  Scissors, LogOut, Upload, AlertTriangle, Film, Loader2, Check, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -33,11 +33,13 @@ type SortMode = 'recent' | 'alpha';
 
 export function Dashboard({ onNewProject, onOpenProject }: DashboardProps) {
   const { user, signOut } = useAuth();
-  const { projects, isLoading, deleteProject, duplicateProject } = useProjects();
+  const { projects, isLoading, deleteProject, duplicateProject, renameProject } = useProjects();
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortMode>('recent');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [reuploadTarget, setReuploadTarget] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = projects
