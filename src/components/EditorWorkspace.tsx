@@ -44,7 +44,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const [isEditingCaptions, setIsEditingCaptions] = useState(false);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [isPreviewingEdits, setIsPreviewingEdits] = useState(false);
-  const [captionSettings, setCaptionSettings] = useState<CaptionSettings>({
+  const defaultCaptionSettings: CaptionSettings = {
     enabled: false,
     style: 'modern',
     animation: 'none',
@@ -54,7 +54,10 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     fontSize: 'medium',
     textColor: 'hsl(0, 0%, 100%)',
     brandColor: 'hsl(45, 100%, 55%)'
-  });
+  };
+  const [captionSettings, setCaptionSettings] = useState<CaptionSettings>(
+    initialProject.captions || defaultCaptionSettings
+  );
   
   const platformConfig = PLATFORM_CONFIGS[project.platform];
   const contentType = platformConfig.contentType;
@@ -107,19 +110,47 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const { deleteProject } = useVideoUpload();
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Auto-save every 2 minutes
+  // Auto-save every 2 minutes (includes caption settings)
   const autoSaveRef = useRef<ReturnType<typeof setInterval>>();
+  const captionSettingsRef = useRef(captionSettings);
+  captionSettingsRef.current = captionSettings;
   useEffect(() => {
     if (project.id === 'demo') return;
     autoSaveRef.current = setInterval(async () => {
       try {
         await supabase
           .from('video_projects')
-          .update({ updated_at: new Date().toISOString(), status: 'in_progress' })
+          .update({
+            updated_at: new Date().toISOString(),
+            status: 'in_progress',
+            caption_settings: captionSettingsRef.current as any,
+          })
           .eq('id', project.id);
       } catch {}
     }, 120_000);
     return () => clearInterval(autoSaveRef.current);
+  }, [project.id]);
+
+  // Load edit history on mount
+  useEffect(() => {
+    if (project.id === 'demo') return;
+    supabase
+      .from('edit_history')
+      .select('*')
+      .eq('project_id', project.id)
+      .order('applied_at', { ascending: true })
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const edits = data.map((e) => ({
+            id: e.id,
+            type: e.edit_type as any,
+            description: e.description,
+            applied: true,
+            timestamp: new Date(e.applied_at),
+          }));
+          setProject((prev) => ({ ...prev, edits }));
+        }
+      });
   }, [project.id]);
 
   const handleDelete = useCallback(async () => {

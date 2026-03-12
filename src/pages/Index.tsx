@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { UploadZone } from '@/components/UploadZone';
 import { EditorWorkspace } from '@/components/EditorWorkspace';
 import { Dashboard } from '@/components/Dashboard';
@@ -18,11 +18,11 @@ const Index = () => {
   const { uploadVideo, isUploading, uploadProgress } = useVideoUpload();
 
   // Sync view when auth state changes
-  useState(() => {
+  useEffect(() => {
     if (user && view === 'upload' && !project) {
       setView('dashboard');
     }
-  });
+  }, [user]);
 
   const handleUpload = useCallback(async (file: File, platform: Platform = 'instagram', initialPrompt?: string) => {
     const config = PLATFORM_CONFIGS[platform];
