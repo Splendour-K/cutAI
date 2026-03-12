@@ -1,0 +1,1 @@
+ALTER TABLE public.video_projects ADD COLUMN caption_settings jsonb DEFAULT null;
