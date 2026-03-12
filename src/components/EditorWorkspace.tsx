@@ -94,9 +94,9 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   // Auto Editor workflow
   const autoEditor = useAutoEditor({ projectId: project.id });
 
-  // Auto-enable edit preview when EDL becomes available
+  // Auto-enable edit preview when EDL becomes available (both after autonomous completion and review mode)
   useEffect(() => {
-    if (autoEditor.workflow.edl && autoEditor.workflow.status === 'reviewing') {
+    if (autoEditor.workflow.edl && (autoEditor.workflow.status === 'reviewing' || autoEditor.workflow.status === 'complete')) {
       setIsPreviewingEdits(true);
     }
   }, [autoEditor.workflow.edl, autoEditor.workflow.status]);
