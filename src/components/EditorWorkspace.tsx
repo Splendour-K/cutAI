@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 import { ChatPanel } from './ChatPanel';
 import { VideoPreview } from './VideoPreview';
 import { EditorHeader } from './EditorHeader';
