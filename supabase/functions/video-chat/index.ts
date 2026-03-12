@@ -35,11 +35,24 @@ serve(async (req) => {
 
     console.log(`Processing chat request with ${messages.length} messages`);
 
-    // Build context from analysis
+    // Build context from analysis and video info
     let contextInfo = '';
+    
+    if (videoUrl) {
+      contextInfo += `\n\n**UPLOADED VIDEO:** The user has uploaded a video titled "${videoTitle || 'Untitled'}". The video URL is: ${videoUrl}`;
+      contextInfo += `\nYou HAVE access to the user's video. Do NOT say you can't see or access their video. The video has been uploaded and analyzed.`;
+    }
+
     if (analysisContext) {
       if (analysisContext.transcription?.fullText) {
         contextInfo += `\n\n**VIDEO TRANSCRIPTION:**\n${analysisContext.transcription.fullText}`;
+        
+        if (analysisContext.transcription.segments?.length > 0) {
+          const segmentsSummary = analysisContext.transcription.segments.slice(0, 20).map((s: any) => 
+            `[${s.startTime?.toFixed(1)}s-${s.endTime?.toFixed(1)}s]: ${s.text}`
+          ).join('\n');
+          contextInfo += `\n\n**TRANSCRIPT SEGMENTS (timed):**\n${segmentsSummary}`;
+        }
       }
       
       if (analysisContext.pauses && analysisContext.pauses.length > 0) {
