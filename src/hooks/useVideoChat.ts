@@ -135,12 +135,14 @@ export function useVideoChat({ platform, contentType, analysisContext, videoUrl,
       if (jsonMatch) {
         try {
           const editData = JSON.parse(jsonMatch[1]);
+          const { editType, description: editDesc, ...parameters } = editData;
           editAction = {
             id: Date.now().toString(),
-            type: editData.editType || 'effect',
-            description: editData.description || content.substring(0, 50),
+            type: editType || 'effect',
+            description: editDesc || content.substring(0, 50),
             applied: true,
             timestamp: new Date(),
+            parameters: Object.keys(parameters).length > 0 ? parameters : undefined,
           };
 
           // Update message with edit action

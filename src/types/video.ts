@@ -76,12 +76,26 @@ export interface VideoProject {
   captions?: CaptionSettings;
 }
 
+export interface EditActionParameters {
+  startTime?: number;
+  endTime?: number;
+  timestamps?: Array<{ start: number; end: number; reason?: string }>;
+  speed?: number;
+  captionStyle?: CaptionStyle;
+  captionAnimation?: CaptionAnimation;
+  zoomType?: 'slow-zoom-in' | 'slow-zoom-out' | 'quick-punch' | 'ken-burns' | 'focus-shift';
+  aspectRatio?: AspectRatio;
+  focalPoint?: { x: number; y: number };
+  [key: string]: unknown;
+}
+
 export interface EditAction {
   id: string;
   type: 'cut' | 'trim' | 'speed' | 'caption' | 'music' | 'effect' | 'format';
   description: string;
   applied: boolean;
   timestamp: Date;
+  parameters?: EditActionParameters;
 }
 
 export type CaptionStyle = 'modern' | 'minimal' | 'bold' | 'subtitle' | 'hormozi' | 'karaoke' | 'pop' | 'glide' | 'bounce';
