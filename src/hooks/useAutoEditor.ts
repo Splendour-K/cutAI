@@ -583,5 +583,8 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     applyEdits,
     resetWorkflow,
     getStats,
+    createEDLFromSegments,
+    excludeTimeRange,
+    addZoomEffect,
   };
 }

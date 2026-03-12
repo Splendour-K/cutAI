@@ -202,19 +202,107 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     const editAction = await sendMessage(content);
     
     if (editAction) {
-      // Handle caption-related edits
-      if (editAction.type === 'caption') {
-        setCaptionSettings(prev => ({ ...prev, enabled: true }));
-        setActiveTab('captions');
-        
-        // If no transcription exists, generate captions
-        const hasTranscription = analysis?.transcription && analysis.transcription.segments?.length > 0;
-        if (!hasTranscription && project.id) {
-          const skipPersistence = project.videoUrl?.startsWith('blob:') ?? false;
-          generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+      const params = editAction.parameters;
+
+      switch (editAction.type) {
+        case 'cut': {
+          // Ensure an EDL exists
+          if (!autoEditor.workflow.edl && analysis?.transcription?.segments) {
+            autoEditor.createEDLFromSegments(
+              analysis.transcription.segments,
+              project.duration || 60
+            );
+          }
+          // Apply cuts from parameters
+          const timestamps = params?.timestamps || (params?.startTime != null && params?.endTime != null
+            ? [{ start: params.startTime, end: params.endTime }]
+            : []);
+          // Use setTimeout to let EDL creation settle in state
+          setTimeout(() => {
+            for (const ts of timestamps) {
+              autoEditor.excludeTimeRange(ts.start, ts.end);
+            }
+            if (timestamps.length > 0) {
+              setIsPreviewingEdits(true);
+              toast.success(`Cut ${timestamps.length} section(s) from the video.`);
+            }
+          }, 50);
+          break;
         }
-        
-        toast.success('Captions enabled! Customize the style in the Captions tab.');
+
+        case 'trim': {
+          if (!autoEditor.workflow.edl && analysis?.transcription?.segments) {
+            autoEditor.createEDLFromSegments(
+              analysis.transcription.segments,
+              project.duration || 60
+            );
+          }
+          const start = params?.startTime ?? 0;
+          const end = params?.endTime ?? (project.duration || 60);
+          // Exclude everything outside the trim range
+          setTimeout(() => {
+            if (start > 0) autoEditor.excludeTimeRange(0, start);
+            if (end < (project.duration || 60)) autoEditor.excludeTimeRange(end, project.duration || 60);
+            setIsPreviewingEdits(true);
+            toast.success(`Trimmed to ${start.toFixed(1)}s – ${end.toFixed(1)}s`);
+          }, 50);
+          break;
+        }
+
+        case 'speed': {
+          const speed = params?.speed ?? 1;
+          setProject(prev => ({ ...prev, playbackRate: speed } as any));
+          toast.success(`Playback speed set to ${speed}x`);
+          break;
+        }
+
+        case 'caption': {
+          setCaptionSettings(prev => ({
+            ...prev,
+            enabled: true,
+            ...(params?.captionStyle && { style: params.captionStyle }),
+            ...(params?.captionAnimation && { animation: params.captionAnimation }),
+          }));
+          setActiveTab('captions');
+          
+          const hasTranscript = analysis?.transcription && analysis.transcription.segments?.length > 0;
+          if (!hasTranscript && project.id) {
+            const skipPersistence = project.videoUrl?.startsWith('blob:') ?? false;
+            generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+          }
+          
+          toast.success('Captions enabled! Customize the style in the Captions tab.');
+          break;
+        }
+
+        case 'effect': {
+          if (!autoEditor.workflow.edl && analysis?.transcription?.segments) {
+            autoEditor.createEDLFromSegments(
+              analysis.transcription.segments,
+              project.duration || 60
+            );
+          }
+          const zoomStart = params?.startTime ?? 0;
+          const zoomEnd = params?.endTime ?? Math.min(zoomStart + 3, project.duration || 60);
+          const zoomType = params?.zoomType ?? 'slow-zoom-in';
+          setTimeout(() => {
+            autoEditor.addZoomEffect(zoomStart, zoomEnd, zoomType, params?.focalPoint);
+            setIsPreviewingEdits(true);
+            toast.success(`Added ${zoomType} effect at ${zoomStart.toFixed(1)}s`);
+          }, 50);
+          break;
+        }
+
+        case 'format': {
+          if (params?.aspectRatio) {
+            handleFormatChange(params.aspectRatio);
+            toast.success(`Format changed to ${params.aspectRatio}`);
+          }
+          break;
+        }
+
+        default:
+          break;
       }
       
       setProject((prev) => ({ 
@@ -225,7 +313,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     } else {
       setProject((prev) => ({ ...prev, status: 'ready' }));
     }
-  }, [sendMessage, analysis, project.id, project.videoFile, project.videoUrl, generateCaptions]);
+  }, [sendMessage, analysis, project.id, project.videoFile, project.videoUrl, project.duration, generateCaptions, autoEditor, handleFormatChange]);
 
   const handleRunAnalysis = useCallback(async () => {
     if (!project.id) return;
