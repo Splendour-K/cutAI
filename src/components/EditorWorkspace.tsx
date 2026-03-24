@@ -399,6 +399,17 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {isAnalyzing && <AnalyzingOverlay onComplete={handleAnalysisComplete} />}
 
+      <ExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        onExportVideo={handleExportVideo}
+        onExportEDL={handleExportEDL}
+        isExporting={isExporting}
+        renderProgress={renderProgress}
+        hasEDL={!!autoEditor.workflow.edl}
+        hasVideo={!!project.videoUrl}
+      />
+
       <EditorHeader project={project} onBack={onBack} onExport={handleExport} onDelete={handleDelete} isDeleting={isDeleting} />
 
       <div className="flex-1 flex min-h-0">
