@@ -17,6 +17,8 @@ interface ExportOptions {
 // Audio ducking config for export
 const DUCK_VOLUME = 0.15;
 const DUCK_FADE_SECONDS = 0.3;
+// Crossfade duration at segment boundaries (seconds)
+const CROSSFADE_SECONDS = 0.15;
 
 export function useVideoExport() {
   const [isExporting, setIsExporting] = useState(false);
