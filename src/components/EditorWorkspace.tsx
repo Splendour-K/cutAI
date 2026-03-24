@@ -350,12 +350,29 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   }, [project.id, project.videoFile, project.videoUrl, generateCaptions]);
 
   const handleExport = useCallback(() => {
-    setProject((prev) => ({ ...prev, status: 'exporting' }));
-    setTimeout(() => {
-      setProject((prev) => ({ ...prev, status: 'ready' }));
-    }, 3000);
+    setShowExportDialog(true);
   }, []);
 
+  const handleExportVideo = useCallback((quality: 'draft' | 'standard' | 'high') => {
+    if (!project.videoUrl || !autoEditor.workflow.edl) {
+      toast.error('No edited video to export. Run the auto-editor or make chat edits first.');
+      return;
+    }
+    downloadRenderedVideo(
+      autoEditor.workflow.edl,
+      project.videoUrl,
+      `${project.title.replace(/\s+/g, '_')}_edited.webm`,
+      { quality }
+    );
+  }, [project.videoUrl, project.title, autoEditor.workflow.edl, downloadRenderedVideo]);
+
+  const handleExportEDL = useCallback((format: 'edl' | 'json' | 'premiere' | 'fcpxml') => {
+    if (!autoEditor.workflow.edl) {
+      toast.error('No edit data to export. Run the auto-editor or make chat edits first.');
+      return;
+    }
+    exportAsEDL(autoEditor.workflow.edl, format, project.videoUrl);
+  }, [autoEditor.workflow.edl, project.videoUrl, exportAsEDL]);
 
 
 
