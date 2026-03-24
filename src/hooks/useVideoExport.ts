@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { EditDecisionList } from '@/types/autoEditor';
 
-interface RenderProgress {
+export interface RenderProgress {
   stage: 'preparing' | 'rendering' | 'encoding' | 'complete' | 'error';
   progress: number;
   message: string;

@@ -9,11 +9,13 @@ import { EditHistory } from './EditHistory';
 import { CaptionEditorPanel } from './CaptionEditorPanel';
 import { AIEditorPanel } from './AIEditorPanel';
 import { AutoEditorPanel } from './AutoEditorPanel';
+import { ExportDialog } from './ExportDialog';
 import { useVideoChat } from '@/hooks/useVideoChat';
 import { useVideoAnalysis } from '@/hooks/useVideoAnalysis';
 import { useEnhancementWorkflow } from '@/hooks/useEnhancementWorkflow';
 import { useAutoEditor } from '@/hooks/useAutoEditor';
 import { useVideoUpload } from '@/hooks/useVideoUpload';
+import { useVideoExport } from '@/hooks/useVideoExport';
 import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -105,6 +107,10 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
       setIsPreviewingEdits(true);
     }
   }, [autoEditor.workflow.edl, autoEditor.workflow.status]);
+
+  // Video export
+  const { isExporting, renderProgress, exportAsEDL, downloadRenderedVideo } = useVideoExport();
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   // Video upload/delete
   const { deleteProject } = useVideoUpload();
@@ -344,12 +350,29 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   }, [project.id, project.videoFile, project.videoUrl, generateCaptions]);
 
   const handleExport = useCallback(() => {
-    setProject((prev) => ({ ...prev, status: 'exporting' }));
-    setTimeout(() => {
-      setProject((prev) => ({ ...prev, status: 'ready' }));
-    }, 3000);
+    setShowExportDialog(true);
   }, []);
 
+  const handleExportVideo = useCallback((quality: 'draft' | 'standard' | 'high') => {
+    if (!project.videoUrl || !autoEditor.workflow.edl) {
+      toast.error('No edited video to export. Run the auto-editor or make chat edits first.');
+      return;
+    }
+    downloadRenderedVideo(
+      autoEditor.workflow.edl,
+      project.videoUrl,
+      `${project.title.replace(/\s+/g, '_')}_edited.webm`,
+      { quality }
+    );
+  }, [project.videoUrl, project.title, autoEditor.workflow.edl, downloadRenderedVideo]);
+
+  const handleExportEDL = useCallback((format: 'edl' | 'json' | 'premiere' | 'fcpxml') => {
+    if (!autoEditor.workflow.edl) {
+      toast.error('No edit data to export. Run the auto-editor or make chat edits first.');
+      return;
+    }
+    exportAsEDL(autoEditor.workflow.edl, format, project.videoUrl);
+  }, [autoEditor.workflow.edl, project.videoUrl, exportAsEDL]);
 
 
 
@@ -375,6 +398,17 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {isAnalyzing && <AnalyzingOverlay onComplete={handleAnalysisComplete} />}
+
+      <ExportDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        onExportVideo={handleExportVideo}
+        onExportEDL={handleExportEDL}
+        isExporting={isExporting}
+        renderProgress={renderProgress}
+        hasEDL={!!autoEditor.workflow.edl}
+        hasVideo={!!project.videoUrl}
+      />
 
       <EditorHeader project={project} onBack={onBack} onExport={handleExport} onDelete={handleDelete} isDeleting={isDeleting} />
 
