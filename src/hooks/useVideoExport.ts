@@ -169,8 +169,27 @@ export function useVideoExport() {
           segment.originalStartTime
         );
 
+        // Schedule crossfade: fade in at segment start, fade out at segment end
+        const isFirstSegment = segIndex === 0;
+        const isLastSegment = segIndex === segments.length - 1;
+        const segNow = audioCtx.currentTime;
+
+        if (!isFirstSegment) {
+          // Fade in from silence to avoid pop at cut point
+          gainNode.gain.setValueAtTime(0.01, segNow);
+          gainNode.gain.exponentialRampToValueAtTime(1.0, segNow + CROSSFADE_SECONDS);
+        }
+
         // Play segment in real-time to capture audio
         const segmentDuration = segment.duration;
+
+        if (!isLastSegment && segmentDuration > CROSSFADE_SECONDS) {
+          // Schedule fade out near end of segment
+          const fadeOutTime = segNow + segmentDuration - CROSSFADE_SECONDS;
+          gainNode.gain.setValueAtTime(1.0, fadeOutTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, fadeOutTime + CROSSFADE_SECONDS);
+        }
+
         video.play();
 
         const startWallTime = performance.now();
