@@ -1,0 +1,199 @@
+import { useState } from 'react';
+import { Download, FileJson, FileText, Film, Loader2, Check, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import type { RenderProgress } from '@/hooks/useVideoExport';
+
+type ExportFormat = 'video' | 'edl' | 'json' | 'premiere' | 'fcpxml';
+type ExportQuality = 'draft' | 'standard' | 'high';
+
+interface ExportDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onExportVideo: (quality: ExportQuality) => void;
+  onExportEDL: (format: 'edl' | 'json' | 'premiere' | 'fcpxml') => void;
+  isExporting: boolean;
+  renderProgress: RenderProgress | null;
+  hasEDL: boolean;
+  hasVideo: boolean;
+}
+
+const FORMAT_OPTIONS: { id: ExportFormat; label: string; description: string; icon: React.ReactNode; group: 'render' | 'file' }[] = [
+  { id: 'video', label: 'Download Video', description: 'Render edited video as WebM with cuts & zooms applied', icon: <Film className="w-5 h-5" />, group: 'render' },
+  { id: 'json', label: 'JSON (EDL)', description: 'Full edit decision list as structured JSON', icon: <FileJson className="w-5 h-5" />, group: 'file' },
+  { id: 'edl', label: 'CMX 3600 EDL', description: 'Standard EDL for DaVinci Resolve, Avid, etc.', icon: <FileText className="w-5 h-5" />, group: 'file' },
+  { id: 'premiere', label: 'Premiere XML', description: 'Adobe Premiere Pro project XML', icon: <FileText className="w-5 h-5" />, group: 'file' },
+  { id: 'fcpxml', label: 'FCPXML', description: 'Final Cut Pro X project file', icon: <FileText className="w-5 h-5" />, group: 'file' },
+];
+
+const QUALITY_OPTIONS: { id: ExportQuality; label: string; description: string }[] = [
+  { id: 'draft', label: 'Draft', description: '50% resolution, fast' },
+  { id: 'standard', label: 'Standard', description: '75% resolution, balanced' },
+  { id: 'high', label: 'High', description: 'Full resolution, slower' },
+];
+
+export function ExportDialog({
+  open,
+  onOpenChange,
+  onExportVideo,
+  onExportEDL,
+  isExporting,
+  renderProgress,
+  hasEDL,
+  hasVideo,
+}: ExportDialogProps) {
+  const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('video');
+  const [selectedQuality, setSelectedQuality] = useState<ExportQuality>('standard');
+
+  const handleExport = () => {
+    if (selectedFormat === 'video') {
+      onExportVideo(selectedQuality);
+    } else {
+      onExportEDL(selectedFormat as 'edl' | 'json' | 'premiere' | 'fcpxml');
+    }
+  };
+
+  const isRendering = isExporting && renderProgress;
+  const isComplete = renderProgress?.stage === 'complete';
+  const isError = renderProgress?.stage === 'error';
+
+  return (
+    <Dialog open={open} onOpenChange={isExporting ? undefined : onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Download className="w-5 h-5 text-primary" />
+            Export Project
+          </DialogTitle>
+          <DialogDescription>
+            Choose a format and quality for your export.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isRendering ? (
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-3">
+              {isComplete ? (
+                <Check className="w-5 h-5 text-green-500" />
+              ) : isError ? (
+                <X className="w-5 h-5 text-destructive" />
+              ) : (
+                <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              )}
+              <span className="text-sm font-medium text-foreground">
+                {renderProgress.message}
+              </span>
+            </div>
+            <Progress value={renderProgress.progress} className="h-2" />
+            <p className="text-xs text-muted-foreground text-center">
+              {renderProgress.stage === 'preparing' && 'Loading source video...'}
+              {renderProgress.stage === 'rendering' && 'Processing frames with effects...'}
+              {renderProgress.stage === 'encoding' && 'Finalizing video file...'}
+              {renderProgress.stage === 'complete' && 'Your file has been downloaded.'}
+              {renderProgress.stage === 'error' && 'Something went wrong. Please try again.'}
+            </p>
+            {(isComplete || isError) && (
+              <Button
+                variant="outline"
+                className="w-full mt-2"
+                onClick={() => onOpenChange(false)}
+              >
+                Close
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-5 py-2">
+            {/* Format selection */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Render</p>
+              {FORMAT_OPTIONS.filter(f => f.group === 'render').map((fmt) => (
+                <button
+                  key={fmt.id}
+                  onClick={() => setSelectedFormat(fmt.id)}
+                  disabled={fmt.id === 'video' && !hasVideo}
+                  className={cn(
+                    'w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-colors',
+                    selectedFormat === fmt.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-muted-foreground/30',
+                    fmt.id === 'video' && !hasVideo && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <div className={cn('mt-0.5', selectedFormat === fmt.id ? 'text-primary' : 'text-muted-foreground')}>
+                    {fmt.icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{fmt.label}</p>
+                    <p className="text-xs text-muted-foreground">{fmt.description}</p>
+                  </div>
+                </button>
+              ))}
+
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider pt-2">Project Files</p>
+              {FORMAT_OPTIONS.filter(f => f.group === 'file').map((fmt) => (
+                <button
+                  key={fmt.id}
+                  onClick={() => setSelectedFormat(fmt.id)}
+                  disabled={!hasEDL}
+                  className={cn(
+                    'w-full flex items-start gap-3 p-3 rounded-lg border text-left transition-colors',
+                    selectedFormat === fmt.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-muted-foreground/30',
+                    !hasEDL && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <div className={cn('mt-0.5', selectedFormat === fmt.id ? 'text-primary' : 'text-muted-foreground')}>
+                    {fmt.icon}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{fmt.label}</p>
+                    <p className="text-xs text-muted-foreground">{fmt.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Quality selector (only for video) */}
+            {selectedFormat === 'video' && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quality</p>
+                <div className="flex gap-2">
+                  {QUALITY_OPTIONS.map((q) => (
+                    <button
+                      key={q.id}
+                      onClick={() => setSelectedQuality(q.id)}
+                      className={cn(
+                        'flex-1 p-2 rounded-lg border text-center transition-colors',
+                        selectedQuality === q.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-muted-foreground/30'
+                      )}
+                    >
+                      <p className="text-sm font-medium text-foreground">{q.label}</p>
+                      <p className="text-[10px] text-muted-foreground">{q.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button onClick={handleExport} className="w-full gap-2" variant="ai">
+              <Download className="w-4 h-4" />
+              {selectedFormat === 'video' ? 'Render & Download' : `Export as ${selectedFormat.toUpperCase()}`}
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
