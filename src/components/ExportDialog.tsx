@@ -82,7 +82,7 @@ export function ExportDialog({
           <div className="space-y-4 py-4">
             <div className="flex items-center gap-3">
               {isComplete ? (
-                <Check className="w-5 h-5 text-green-500" />
+                <Check className="w-5 h-5 text-primary" />
               ) : isError ? (
                 <X className="w-5 h-5 text-destructive" />
               ) : (
