@@ -108,6 +108,10 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     }
   }, [autoEditor.workflow.edl, autoEditor.workflow.status]);
 
+  // Video export
+  const { isExporting, renderProgress, exportAsEDL, downloadRenderedVideo } = useVideoExport();
+  const [showExportDialog, setShowExportDialog] = useState(false);
+
   // Video upload/delete
   const { deleteProject } = useVideoUpload();
   const [isDeleting, setIsDeleting] = useState(false);
