@@ -15,6 +15,67 @@ interface UseAutoEditorProps {
   projectId: string;
 }
 
+const MIN_BROLL_CONFIDENCE = 0.6;
+const MIN_BROLL_GAP_SECONDS = 6;
+const MAX_BROLL_COVERAGE = 0.35;
+
+const normalizeIdea = (value?: string) =>
+  (value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort()
+    .join(' ');
+
+/**
+ * Keeps only B-roll placements a professional editor would keep:
+ * confident, well-spaced, non-repetitive, and within a sane coverage budget.
+ */
+function sanitizeBRollSuggestions(
+  suggestions: BRollSuggestion[],
+  runtime: number,
+): BRollSuggestion[] {
+  const budget = Math.max(runtime, 1) * MAX_BROLL_COVERAGE;
+  const seenQueries = new Set<string>();
+  const seenKeywords = new Set<string>();
+  const kept: BRollSuggestion[] = [];
+  let coverage = 0;
+
+  const candidates = [...suggestions]
+    .filter((br) => Boolean(br?.searchQuery?.trim()))
+    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+  for (const br of candidates) {
+    if (typeof br.confidence === 'number' && br.confidence < MIN_BROLL_CONFIDENCE) continue;
+
+    const duration = Math.min(Math.max(br.duration || 3, 1.5), 5);
+    const timestamp = Math.max(0, br.timestamp || 0);
+
+    // Never let B-roll cover the hook or run past the end of the edit.
+    if (timestamp < 3 || timestamp + duration > runtime) continue;
+
+    // Spacing: no two clips back to back.
+    const previous = kept[kept.length - 1];
+    if (previous && timestamp - (previous.timestamp + (previous.duration || 3)) < MIN_BROLL_GAP_SECONDS) continue;
+
+    // Variety: reject repeated shot ideas.
+    const queryKey = normalizeIdea(br.searchQuery);
+    const keywordKey = normalizeIdea((br.keywords || []).slice(0, 2).join(' '));
+    if (seenQueries.has(queryKey)) continue;
+    if (keywordKey && seenKeywords.has(keywordKey)) continue;
+
+    if (coverage + duration > budget) continue;
+
+    seenQueries.add(queryKey);
+    if (keywordKey) seenKeywords.add(keywordKey);
+    coverage += duration;
+    kept.push({ ...br, timestamp, duration });
+  }
+
+  return kept;
+}
+
 export function useAutoEditor({ projectId }: UseAutoEditorProps) {
   const [workflow, setWorkflow] = useState<AutoEditorWorkflow>({
     status: 'idle',
@@ -51,6 +112,7 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
       targetStyle?: 'fast-paced' | 'moderate' | 'documentary' | 'auto';
       targetDurationReduction?: number;
       platform?: string;
+      aspectRatio?: string;
       preferences?: {
         enableZooms: boolean;
         enableBRoll: boolean;
@@ -95,36 +157,59 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
       // Auto-approve all AI decisions — no intermediate review
       const approvedEdl = autoApproveAll(rawEdl);
 
-      // Auto-fetch stock footage for each approved B-roll suggestion
-      updateWorkflow({ progress: 75 });
-      toast.info('Fetching stock footage for B-roll...');
-
-      const bRollWithFootage = await Promise.allSettled(
-        approvedEdl.bRollSuggestions.map(async (br) => {
-          if (!br.searchQuery) return { ...br, status: 'rejected' as const };
-          try {
-            const { data: searchData, error: searchError } = await supabase.functions.invoke('search-stock-footage', {
-              body: { query: br.searchQuery, page: 1, perPage: 1, orientation: 'landscape' },
-            });
-            if (searchError || !searchData?.videos?.length) {
-              return { ...br, status: 'rejected' as const };
-            }
-            const video = searchData.videos[0];
-            return {
-              ...br,
-              stockFootageUrl: video.previewUrl || video.downloadUrl,
-              status: 'ready' as const,
-              reason: video.attribution ? `${br.reason} | ${video.attribution}` : br.reason,
-            };
-          } catch {
-            return { ...br, status: 'rejected' as const };
-          }
-        })
+      // Sanitize AI placements before sourcing footage: drop low-confidence guesses,
+      // enforce spacing, and remove duplicate visual ideas.
+      const cleanedSuggestions = sanitizeBRollSuggestions(
+        approvedEdl.bRollSuggestions || [],
+        approvedEdl.editedDuration || videoDuration,
       );
 
-      const resolvedBRoll = bRollWithFootage.map(result =>
-        result.status === 'fulfilled' ? result.value : { ...approvedEdl.bRollSuggestions[0], status: 'rejected' as const }
-      ).filter(br => br.status === 'ready');
+      // Source the best-matching stock clip for each placement
+      updateWorkflow({ progress: 75 });
+      let resolvedBRoll: BRollSuggestion[] = [];
+
+      if (cleanedSuggestions.length) {
+        toast.info(`Sourcing ${cleanedSuggestions.length} B-roll clips...`);
+        try {
+          const { data: selection, error: selectionError } = await supabase.functions.invoke('select-broll', {
+            body: {
+              suggestions: cleanedSuggestions,
+              aspectRatio: options?.aspectRatio,
+              style: approvedEdl.style || options?.targetStyle,
+              platform: options?.platform,
+            },
+          });
+
+          if (selectionError) throw selectionError;
+
+          const byId = new Map<string, any>(
+            (selection?.results || []).map((r: any) => [r.id, r]),
+          );
+
+          resolvedBRoll = cleanedSuggestions
+            .map((br) => {
+              const match = byId.get(br.id);
+              if (!match?.ok || !match.stockFootageUrl) return null;
+              return {
+                ...br,
+                stockFootageUrl: match.stockFootageUrl,
+                downloadUrl: match.downloadUrl,
+                thumbnailUrl: match.thumbnailUrl,
+                sourceId: match.sourceId,
+                clipStartOffset: match.clipStartOffset ?? 0,
+                clipDuration: match.clipDuration,
+                attribution: match.attribution,
+                matchScore: match.matchScore,
+                status: 'ready' as const,
+                reason: match.attribution ? `${br.reason} | ${match.attribution}` : br.reason,
+              } as BRollSuggestion;
+            })
+            .filter((br): br is BRollSuggestion => br !== null);
+        } catch (bRollError) {
+          console.error('B-roll sourcing failed:', bRollError);
+          toast.error('Could not source stock footage — continuing without B-roll.');
+        }
+      }
 
       updateWorkflow({ progress: 90 });
 
