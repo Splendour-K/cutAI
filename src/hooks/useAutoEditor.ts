@@ -130,11 +130,57 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
               };
             }
 
-            // Fallback to client-side Pexels search
+            // Fallback to client-side Pexels search with style re-ranking and histogram upload
             try {
               const { searchPexelsVideos } = await import('@/lib/broll/pexels');
-              const results = await searchPexelsVideos(br.searchQuery, 2);
+              const { computeImageHistogram, computeVideoStyle, histogramSimilarity } = await import('@/lib/broll/style');
+              const results = await searchPexelsVideos(br.searchQuery, 4);
               if (results && results.length > 0) {
+                // Upload thumbnail histograms for the top results to the server cache (best-effort)
+                for (const r of results.slice(0, 4)) {
+                  try {
+                    const thumb = (r as any).thumbnailUrl || (r as any).previewUrl;
+                    if (!thumb) continue;
+                    const imgHist = await computeImageHistogram(thumb);
+                    // upload to server so it can re-rank later
+                    try {
+                      await supabase.functions.invoke('search-stock-footage', {
+                        body: { action: 'upload_hist', id: `pexels_${r.id}`, histogram: imgHist },
+                      }).catch(() => null);
+                    } catch (e) {
+                      // ignore upload errors
+                    }
+                  } catch (e) {
+                    // ignore individual thumbnail failures
+                  }
+                }
+
+                // if we have a source style profile in options, try to re-rank by style
+                const sourceStyle = (options as any)?.styleProfile as any;
+                if (sourceStyle && sourceStyle.histogram) {
+                  // compute hist for each candidate thumbnail and pick best similarity
+                  const scored = await Promise.all(results.map(async (v) => {
+                    try {
+                      const thumb = (v as any).thumbnailUrl || v.previewUrl;
+                      const imgHist = await computeImageHistogram(thumb);
+                      const sim = histogramSimilarity(sourceStyle.histogram, imgHist);
+                      return { v, score: sim };
+                    } catch (e) {
+                      return { v, score: 0 };
+                    }
+                  }));
+                  scored.sort((a,b) => b.score - a.score);
+                  const best = scored[0];
+                  if (best && best.v) {
+                    return {
+                      ...br,
+                      stockFootageUrl: best.v.previewUrl || best.v.downloadUrl,
+                      status: 'ready' as const,
+                      reason: best.v.attribution ? `${br.reason} | ${best.v.attribution}` : br.reason,
+                    };
+                  }
+                }
+
                 const video = results[0];
                 return {
                   ...br,

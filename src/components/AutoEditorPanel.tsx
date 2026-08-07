@@ -37,6 +37,7 @@ interface AutoEditorPanelProps {
   currentTime: number;
   platform?: string;
   onSeek?: (time: number) => void;
+  videoUrl?: string;
   
   onAnalyze: (
     transcript: { fullText: string; segments: TranscriptSegment[] },
@@ -94,7 +95,8 @@ export function AutoEditorPanel({
   onReset,
   onEnterReviewMode,
   stats,
-}: AutoEditorPanelProps) {
+  videoUrl,
+}: AutoEditorPanelProps & { videoUrl?: string }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [editingOptions, setEditingOptions] = useState<{
@@ -123,7 +125,18 @@ export function AutoEditorPanel({
     if (!transcript) return;
     setIsAnalyzing(true);
     try {
-      await onAnalyze(transcript, videoDuration, editingOptions);
+      // compute style profile if videoUrl provided
+      let styleProfile: any = undefined;
+      if (videoUrl) {
+        try {
+          const { computeVideoStyle } = await import('@/lib/broll/style');
+          styleProfile = await computeVideoStyle(videoUrl, 4);
+        } catch (e) {
+          console.warn('Failed to compute video style profile', e);
+        }
+      }
+
+      await onAnalyze(transcript, videoDuration, { ...editingOptions, styleProfile });
     } finally {
       setIsAnalyzing(false);
     }

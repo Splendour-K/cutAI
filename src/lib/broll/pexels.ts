@@ -2,6 +2,7 @@ type PexelsVideo = {
   id: number;
   url: string;
   duration: number;
+  image: string;
   user?: { name?: string; url?: string };
   video_files: { id: number; quality?: string; file_type?: string; width?: number; height?: number; link: string }[];
 };
@@ -29,6 +30,7 @@ export async function searchPexelsVideos(query: string, perPage = 3) {
 
   return videos.map(v => ({
     id: v.id,
+    thumbnailUrl: v.image,
     previewUrl: (v.video_files && v.video_files[0] && v.video_files[0].link) || v.url,
     downloadUrl: (v.video_files && v.video_files[0] && v.video_files[0].link) || v.url,
     attribution: v.user?.name ? `${v.user.name} / Pexels` : 'Pexels',

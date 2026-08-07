@@ -187,8 +187,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
           // No existing analysis — show overlay and generate
           setIsAnalyzing(true);
           setHasCheckedExisting(true);
-          const skipPersistence = project.videoUrl.startsWith('blob:') ? true : false;
-          generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+          const skipPersistence = project.id === 'demo' || project.videoUrl.startsWith('blob:');
+          generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence, project.title);
         } else {
           setHasCheckedExisting(true);
           setIsAnalyzing(false);
@@ -278,7 +278,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
           const hasTranscript = analysis?.transcription && analysis.transcription.segments?.length > 0;
           if (!hasTranscript && project.id) {
             const skipPersistence = project.videoUrl?.startsWith('blob:') ?? false;
-            generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+            generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence, project.title);
           }
           
           toast.success('Captions enabled! Customize the style in the Captions tab.');
@@ -340,7 +340,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     
     try {
       const skipPersistence = project.videoUrl?.startsWith('blob:') ?? false;
-      await generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+      await generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence, project.title);
       setCaptionSettings(prev => ({ ...prev, enabled: true }));
       setActiveTab('captions');
       toast.success('Captions generated! Choose a style to customize.');
@@ -557,6 +557,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                   segments: analysis.transcription.segments
                 } : undefined}
                 videoDuration={project.duration || 60}
+                videoUrl={project.videoUrl}
                 currentTime={currentVideoTime}
                 platform={project.platform}
                 onAnalyze={autoEditor.analyzeAndGenerateEDL}
