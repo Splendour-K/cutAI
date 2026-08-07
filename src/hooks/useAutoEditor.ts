@@ -15,6 +15,67 @@ interface UseAutoEditorProps {
   projectId: string;
 }
 
+const MIN_BROLL_CONFIDENCE = 0.6;
+const MIN_BROLL_GAP_SECONDS = 6;
+const MAX_BROLL_COVERAGE = 0.35;
+
+const normalizeIdea = (value?: string) =>
+  (value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort()
+    .join(' ');
+
+/**
+ * Keeps only B-roll placements a professional editor would keep:
+ * confident, well-spaced, non-repetitive, and within a sane coverage budget.
+ */
+function sanitizeBRollSuggestions(
+  suggestions: BRollSuggestion[],
+  runtime: number,
+): BRollSuggestion[] {
+  const budget = Math.max(runtime, 1) * MAX_BROLL_COVERAGE;
+  const seenQueries = new Set<string>();
+  const seenKeywords = new Set<string>();
+  const kept: BRollSuggestion[] = [];
+  let coverage = 0;
+
+  const candidates = [...suggestions]
+    .filter((br) => Boolean(br?.searchQuery?.trim()))
+    .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+  for (const br of candidates) {
+    if (typeof br.confidence === 'number' && br.confidence < MIN_BROLL_CONFIDENCE) continue;
+
+    const duration = Math.min(Math.max(br.duration || 3, 1.5), 5);
+    const timestamp = Math.max(0, br.timestamp || 0);
+
+    // Never let B-roll cover the hook or run past the end of the edit.
+    if (timestamp < 3 || timestamp + duration > runtime) continue;
+
+    // Spacing: no two clips back to back.
+    const previous = kept[kept.length - 1];
+    if (previous && timestamp - (previous.timestamp + (previous.duration || 3)) < MIN_BROLL_GAP_SECONDS) continue;
+
+    // Variety: reject repeated shot ideas.
+    const queryKey = normalizeIdea(br.searchQuery);
+    const keywordKey = normalizeIdea((br.keywords || []).slice(0, 2).join(' '));
+    if (seenQueries.has(queryKey)) continue;
+    if (keywordKey && seenKeywords.has(keywordKey)) continue;
+
+    if (coverage + duration > budget) continue;
+
+    seenQueries.add(queryKey);
+    if (keywordKey) seenKeywords.add(keywordKey);
+    coverage += duration;
+    kept.push({ ...br, timestamp, duration });
+  }
+
+  return kept;
+}
+
 export function useAutoEditor({ projectId }: UseAutoEditorProps) {
   const [workflow, setWorkflow] = useState<AutoEditorWorkflow>({
     status: 'idle',
