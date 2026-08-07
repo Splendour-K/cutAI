@@ -107,14 +107,17 @@ function pickFile(video: PexelsVideo, orientation: string) {
     return true;
   });
   const pool = matchesOrientation.length ? matchesOrientation : mp4s;
-  // Prefer ~1080p: big enough to look sharp, small enough to stream in preview.
-  const sorted = [...pool].sort((a, b) => {
-    const score = (f: PexelsFile) => -Math.abs((f.height || 720) - 1080);
-    return score(b) - score(a);
-  });
+  // Use the short side so portrait and landscape files are compared fairly.
+  const shortSide = (f: PexelsFile) => Math.min(f.width || 0, f.height || 0) || 720;
+  const sorted = [...pool].sort(
+    (a, b) => Math.abs(shortSide(a) - 1080) - Math.abs(shortSide(b) - 1080),
+  );
   const best = sorted[0] || video.video_files[0];
+  // Preview stream: ~720p short side keeps playback smooth without looking soft.
   const preview =
-    pool.find((f) => (f.height || 0) <= 720 && (f.height || 0) >= 360) || best;
+    [...pool]
+      .sort((a, b) => Math.abs(shortSide(a) - 720) - Math.abs(shortSide(b) - 720))
+      .find((f) => shortSide(f) >= 480) || best;
   return { best, preview };
 }
 
@@ -155,9 +158,12 @@ function scoreCandidate(
   else score -= 18;
 
   // 4. Resolution quality.
-  const maxH = Math.max(...video.video_files.map((f) => f.height || 0), video.height || 0);
-  if (maxH >= 1080) score += 8;
-  else if (maxH >= 720) score += 4;
+  const bestShort = Math.max(
+    ...video.video_files.map((f) => Math.min(f.width || 0, f.height || 0)),
+    Math.min(video.width || 0, video.height || 0),
+  );
+  if (bestShort >= 1080) score += 8;
+  else if (bestShort >= 720) score += 4;
   else score -= 6;
 
   // 5. Variety: penalise the same creator or an over-used visual theme.
