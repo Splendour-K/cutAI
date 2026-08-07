@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.search-stock-footage]
 verify_jwt = false
+
+[functions.mcp]
+verify_jwt = false
