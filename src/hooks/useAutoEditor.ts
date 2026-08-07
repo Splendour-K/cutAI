@@ -51,6 +51,7 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
       targetStyle?: 'fast-paced' | 'moderate' | 'documentary' | 'auto';
       targetDurationReduction?: number;
       platform?: string;
+      aspectRatio?: string;
       preferences?: {
         enableZooms: boolean;
         enableBRoll: boolean;
@@ -95,36 +96,59 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
       // Auto-approve all AI decisions — no intermediate review
       const approvedEdl = autoApproveAll(rawEdl);
 
-      // Auto-fetch stock footage for each approved B-roll suggestion
-      updateWorkflow({ progress: 75 });
-      toast.info('Fetching stock footage for B-roll...');
-
-      const bRollWithFootage = await Promise.allSettled(
-        approvedEdl.bRollSuggestions.map(async (br) => {
-          if (!br.searchQuery) return { ...br, status: 'rejected' as const };
-          try {
-            const { data: searchData, error: searchError } = await supabase.functions.invoke('search-stock-footage', {
-              body: { query: br.searchQuery, page: 1, perPage: 1, orientation: 'landscape' },
-            });
-            if (searchError || !searchData?.videos?.length) {
-              return { ...br, status: 'rejected' as const };
-            }
-            const video = searchData.videos[0];
-            return {
-              ...br,
-              stockFootageUrl: video.previewUrl || video.downloadUrl,
-              status: 'ready' as const,
-              reason: video.attribution ? `${br.reason} | ${video.attribution}` : br.reason,
-            };
-          } catch {
-            return { ...br, status: 'rejected' as const };
-          }
-        })
+      // Sanitize AI placements before sourcing footage: drop low-confidence guesses,
+      // enforce spacing, and remove duplicate visual ideas.
+      const cleanedSuggestions = sanitizeBRollSuggestions(
+        approvedEdl.bRollSuggestions || [],
+        approvedEdl.editedDuration || videoDuration,
       );
 
-      const resolvedBRoll = bRollWithFootage.map(result =>
-        result.status === 'fulfilled' ? result.value : { ...approvedEdl.bRollSuggestions[0], status: 'rejected' as const }
-      ).filter(br => br.status === 'ready');
+      // Source the best-matching stock clip for each placement
+      updateWorkflow({ progress: 75 });
+      let resolvedBRoll: BRollSuggestion[] = [];
+
+      if (cleanedSuggestions.length) {
+        toast.info(`Sourcing ${cleanedSuggestions.length} B-roll clips...`);
+        try {
+          const { data: selection, error: selectionError } = await supabase.functions.invoke('select-broll', {
+            body: {
+              suggestions: cleanedSuggestions,
+              aspectRatio: options?.aspectRatio,
+              style: approvedEdl.style || options?.targetStyle,
+              platform: options?.platform,
+            },
+          });
+
+          if (selectionError) throw selectionError;
+
+          const byId = new Map<string, any>(
+            (selection?.results || []).map((r: any) => [r.id, r]),
+          );
+
+          resolvedBRoll = cleanedSuggestions
+            .map((br) => {
+              const match = byId.get(br.id);
+              if (!match?.ok || !match.stockFootageUrl) return null;
+              return {
+                ...br,
+                stockFootageUrl: match.stockFootageUrl,
+                downloadUrl: match.downloadUrl,
+                thumbnailUrl: match.thumbnailUrl,
+                sourceId: match.sourceId,
+                clipStartOffset: match.clipStartOffset ?? 0,
+                clipDuration: match.clipDuration,
+                attribution: match.attribution,
+                matchScore: match.matchScore,
+                status: 'ready' as const,
+                reason: match.attribution ? `${br.reason} | ${match.attribution}` : br.reason,
+              } as BRollSuggestion;
+            })
+            .filter((br): br is BRollSuggestion => br !== null);
+        } catch (bRollError) {
+          console.error('B-roll sourcing failed:', bRollError);
+          toast.error('Could not source stock footage — continuing without B-roll.');
+        }
+      }
 
       updateWorkflow({ progress: 90 });
 
