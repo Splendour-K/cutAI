@@ -113,7 +113,12 @@ Return a JSON object with this EXACT structure:
       "duration": <2-5 seconds>,
       "type": "contextual" | "reaction" | "cutaway" | "overlay",
       "description": "<what should be shown>",
-      "searchQuery": "<stock footage search query>",
+      "searchQuery": "<2-4 word literal stock-footage search query>",
+      "altQueries": ["<alternative query 1>", "<alternative query 2>"],
+      "keywords": ["<concrete visual noun>", "<concrete visual noun>"],
+      "mood": "<energetic | calm | dramatic | hopeful | serious | playful>",
+      "colorTone": "<warm golden | cool blue | dark moody | bright airy | neutral>",
+      "motion": "<static | slow pan | slow zoom | medium movement | fast action>",
       "reason": "<why this B-roll fits>",
       "confidence": <0-1>,
       "position": "fullscreen" | "pip-topright" | "split-left",
@@ -157,11 +162,24 @@ CRITICAL RULES:
 2. Remove pauses longer than 0.5s, filler words (um, uh, like, you know)
 3. Cut repetitive explanations - keep the clearest version
 4. Add zoom at emotional peaks, emphasis words, or reveals
-5. Suggest B-roll at metaphors, references, or transition points
+5. Suggest B-roll at metaphors, concrete references, examples, lists, or transition points
 6. newStartTime/newEndTime should reflect the edited timeline position
 7. Maintain logical flow - don't cut mid-sentence inappropriately
 8. Use quick-punch zoom for impact words, slow-zoom for emphasis sections
-9. B-roll should enhance, not distract from the main content`;
+9. B-roll should enhance, not distract from the main content
+
+B-ROLL DIRECTION (this is the highest-priority part of your job):
+- Read the WHOLE transcript first and decide what the video is actually about, its tone, and its setting. Every B-roll choice must serve that story.
+- Only place B-roll where the speaker names something visual: an object, place, action, person, process, number/scale, comparison, or metaphor. If a line has nothing visual, place NO B-roll there.
+- Anchor every clip to a spoken moment: "timestamp" must fall inside the segment where that idea is spoken, and "duration" must end before the idea changes (2-5s).
+- Density: roughly one clip every 12-20 seconds of edited runtime for fast-paced/short platforms, one every 20-35 seconds for moderate/tutorial, and slightly denser for documentary. NEVER place two clips within 6 seconds of each other, and never cover more than ~35% of the total runtime with B-roll.
+- Keep A-roll on screen for the hook (first 3 seconds) and for any direct-to-camera emotional beat.
+- "searchQuery" must be literal, filmable, and generic enough that stock libraries have it: "city traffic at night", "hands typing laptop", "farmer walking field". Never use abstract phrases ("success mindset"), proper nouns, brand names, or full sentences.
+- "altQueries" must be genuinely DIFFERENT visual angles on the same idea, not synonyms of the same shot — they are used as fallbacks when the first query has no good match.
+- Variety is mandatory: no two suggestions in the whole EDL may share the same searchQuery, the same primary keyword, or show essentially the same shot. Vary subject, scale (wide/close), and setting across the video.
+- Match the source video: infer its likely look from the content and keep "colorTone", "mood", and "motion" consistent across the edit so inserts feel like the same film. Use calm, slow-motion or static shots for reflective/slow sections and higher-energy movement for fast, high-energy sections.
+- Prefer "fullscreen" for narrative cutaways and PIP/split only when the speaker's face still matters.
+- Set "confidence" honestly: below 0.6 means you are guessing — in that case omit the suggestion instead.`;
 
     const segmentsText = transcript.segments
       .map((s, i) => `[${s.startTime.toFixed(2)}s - ${s.endTime.toFixed(2)}s] Segment ${i + 1}: "${s.text}"`)
