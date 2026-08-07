@@ -29,12 +29,24 @@ export interface BRollSuggestion {
   type: BRollType;
   description: string; // What B-roll should show
   searchQuery: string; // Query for stock footage
+  altQueries?: string[]; // Fallback/alternative stock searches
+  keywords?: string[]; // Concrete visual nouns for relevance scoring
+  mood?: string; // e.g. 'energetic', 'calm', 'dramatic'
+  colorTone?: string; // e.g. 'warm golden', 'cool blue', 'dark moody'
+  motion?: string; // e.g. 'static', 'slow pan', 'fast action'
   reason: string;
   confidence: number;
   position?: 'fullscreen' | 'pip-topright' | 'pip-topleft' | 'pip-bottomright' | 'pip-bottomleft' | 'split-left' | 'split-right';
   scale?: number;
   status: 'suggested' | 'approved' | 'rejected' | 'ready';
   stockFootageUrl?: string; // Generated or selected footage URL
+  downloadUrl?: string; // Full-quality source for export
+  thumbnailUrl?: string;
+  sourceId?: string; // e.g. pexels_12345 — used to avoid duplicates
+  clipStartOffset?: number; // Where to start inside the stock clip
+  clipDuration?: number; // Length of the source clip
+  attribution?: string;
+  matchScore?: number; // Relevance score from the selection engine
 }
 
 // Dynamic zoom effect
