@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { lovable } from '@/integrations/lovable/index';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,6 +11,10 @@ import { toast } from 'sonner';
 
 export default function Auth() {
   const { user, isLoading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const rawNext = searchParams.get('next') ?? '';
+  // Only allow same-origin relative paths.
+  const nextPath = /^\/(?!\/)/.test(rawNext) ? rawNext : '/';
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +32,7 @@ export default function Auth() {
   }
 
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={nextPath} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,7 +50,7 @@ export default function Auth() {
           password,
           options: {
             data: { display_name: displayName },
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: `${window.location.origin}${nextPath}`,
           },
         });
         if (error) throw error;
@@ -63,7 +67,7 @@ export default function Auth() {
     setIsGoogleLoading(true);
     try {
       const { error } = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}${nextPath === '/' ? '' : nextPath}`,
       });
       if (error) throw error;
     } catch (error: any) {
