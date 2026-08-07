@@ -5,6 +5,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Simple file-backed cache to reduce Pexels API calls during development and improve responsiveness.
+const CACHE_FILE = './.pexels_cache.json';
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in ms
+let cache: Record<string, { ts: number; data: any }> = {};
+try {
+  const txt = await Deno.readTextFile(CACHE_FILE);
+  cache = JSON.parse(txt || '{}');
+} catch (e) {
+  // ignore if file doesn't exist or can't be read
+}
+
+async function writeCache() {
+  try {
+    await Deno.writeTextFile(CACHE_FILE, JSON.stringify(cache));
+  } catch (e) {
+    console.warn('Failed to write Pexels cache file', e);
+  }
+}
+
+function cacheKey(query: string, perPage: number, page: number, orientation: string, size: string) {
+  return `${query}::${perPage}::${page}::${orientation}::${size}`;
+}
+
+function getCached(key: string) {
+  const entry = cache[key];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL) {
+    delete cache[key];
+    // best-effort persist
+    writeCache();
+    return null;
+  }
+  return entry.data;
+}
+
+function setCached(key: string, data: any) {
+  cache[key] = { ts: Date.now(), data };
+  // persist asynchronously
+  writeCache();
+}
+
 interface SearchRequest {
   query: string;
   perPage?: number;
@@ -78,22 +119,35 @@ serve(async (req) => {
       size,
     });
 
-    const response = await fetch(
-      `https://api.pexels.com/videos/search?${searchParams}`,
-      {
-        headers: {
-          'Authorization': PEXELS_API_KEY,
-        },
+    const key = cacheKey(query.trim(), perPage, page, orientation, size);
+    const cached = getCached(key);
+    let data: any;
+    if (cached) {
+      data = cached;
+      console.log('Using cached Pexels results for query:', query);
+    } else {
+      const response = await fetch(
+        `https://api.pexels.com/videos/search?${searchParams}`,
+        {
+          headers: {
+            'Authorization': PEXELS_API_KEY,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Pexels API error:', response.status, errorText);
+        throw new Error(`Pexels API error: ${response.status}`);
       }
-    );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Pexels API error:', response.status, errorText);
-      throw new Error(`Pexels API error: ${response.status}`);
+      data = await response.json();
+      try {
+        setCached(key, data);
+      } catch (e) {
+        console.warn('Failed to cache Pexels results', e);
+      }
     }
-
-    const data = await response.json();
     
     // Transform Pexels response to our format
     const videos: StockVideo[] = (data.videos || []).map((video: PexelsVideo) => {
