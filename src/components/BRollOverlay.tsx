@@ -48,7 +48,8 @@ const BRollOverlayBase = forwardRef<HTMLDivElement, BRollOverlayProps>(function 
 
     // Calculate time within B-roll clip
     const bRollStartTime = bRoll.timestamp;
-    const timeIntoClip = currentTime - bRollStartTime;
+    const offset = bRoll.clipStartOffset || 0;
+    const timeIntoClip = currentTime - bRollStartTime + offset;
 
     // Keep video time synced
     if (Math.abs(video.currentTime - timeIntoClip) > 0.5) {
