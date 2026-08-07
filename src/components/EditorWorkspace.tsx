@@ -559,7 +559,12 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 videoDuration={project.duration || 60}
                 currentTime={currentVideoTime}
                 platform={project.platform}
-                onAnalyze={autoEditor.analyzeAndGenerateEDL}
+                onAnalyze={(transcript, duration, options) =>
+                  autoEditor.analyzeAndGenerateEDL(transcript, duration, {
+                    ...(options || {}),
+                    aspectRatio: project.aspectRatio,
+                  })
+                }
                 onToggleSegment={autoEditor.toggleSegmentInclusion}
                 onUpdateSegmentCut={autoEditor.updateSegmentCut}
                 onToggleBRoll={autoEditor.toggleBRoll}
