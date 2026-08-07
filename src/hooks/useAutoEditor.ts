@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { analyzeAutoEdit } from '@/lib/broll/localAnalyzer';
 import type { 
   AutoEditorWorkflow, 
   EditDecisionList, 
@@ -83,14 +84,25 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
             cutFrequency: 'moderate',
           },
         } as AutoEditorAnalysisRequest
-      });
+      }).catch((e) => ({ error: e, data: undefined } as any));
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      let rawEdl: EditDecisionList;
+
+      if (!error && data && !data.error) {
+        rawEdl = data.edl as EditDecisionList;
+      } else {
+        // Fallback to local analyzer (suggestions-only). This is used when the server function is not available
+        toast.info('Using local analyzer for auto-edit suggestions');
+        rawEdl = await analyzeAutoEdit(transcript, videoDuration, {
+          projectId,
+          targetStyle: options?.targetStyle,
+          targetDurationReduction: options?.targetDurationReduction,
+          platform: options?.platform,
+          preferences: options?.preferences,
+        } as any);
+      }
 
       updateWorkflow({ progress: 70 });
-
-      const rawEdl = data.edl as EditDecisionList;
       
       // Auto-approve all AI decisions — no intermediate review
       const approvedEdl = autoApproveAll(rawEdl);
@@ -103,20 +115,42 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
         approvedEdl.bRollSuggestions.map(async (br) => {
           if (!br.searchQuery) return { ...br, status: 'rejected' as const };
           try {
-            const { data: searchData, error: searchError } = await supabase.functions.invoke('search-stock-footage', {
+            // First try server-side search (Supabase function)
+            const invokeResult = await supabase.functions.invoke('search-stock-footage', {
               body: { query: br.searchQuery, page: 1, perPage: 1, orientation: 'landscape' },
-            });
-            if (searchError || !searchData?.videos?.length) {
-              return { ...br, status: 'rejected' as const };
+            }).catch(() => ({ data: null, error: true }));
+
+            if (invokeResult && invokeResult.data && invokeResult.data.videos && invokeResult.data.videos.length > 0) {
+              const video = invokeResult.data.videos[0];
+              return {
+                ...br,
+                stockFootageUrl: video.previewUrl || video.downloadUrl,
+                status: 'ready' as const,
+                reason: video.attribution ? `${br.reason} | ${video.attribution}` : br.reason,
+              };
             }
-            const video = searchData.videos[0];
-            return {
-              ...br,
-              stockFootageUrl: video.previewUrl || video.downloadUrl,
-              status: 'ready' as const,
-              reason: video.attribution ? `${br.reason} | ${video.attribution}` : br.reason,
-            };
-          } catch {
+
+            // Fallback to client-side Pexels search
+            try {
+              const { searchPexelsVideos } = await import('@/lib/broll/pexels');
+              const results = await searchPexelsVideos(br.searchQuery, 2);
+              if (results && results.length > 0) {
+                const video = results[0];
+                return {
+                  ...br,
+                  stockFootageUrl: video.previewUrl || video.downloadUrl,
+                  status: 'ready' as const,
+                  reason: video.attribution ? `${br.reason} | ${video.attribution}` : br.reason,
+                };
+              }
+            } catch (pexErr) {
+              // ignore and fall through to rejected
+              console.warn('Pexels search failed for query', br.searchQuery, pexErr);
+            }
+
+            return { ...br, status: 'rejected' as const };
+          } catch (e) {
+            console.error('Stock search error', e);
             return { ...br, status: 'rejected' as const };
           }
         })
