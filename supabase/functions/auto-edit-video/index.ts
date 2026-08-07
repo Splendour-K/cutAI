@@ -198,7 +198,7 @@ ${transcript.fullText}
 Analyze the content and create:
 1. Optimized A-roll segments (4-8 second cuts)
 2. Sections to remove (silences, fillers, repetition)
-3. B-roll suggestions at appropriate moments${preferences.enableBRoll ? '' : ' (SKIP - disabled)'}
+3. B-roll suggestions placed on spoken visual references, following the B-ROLL DIRECTION rules exactly — well-spaced, non-repeating, and stylistically consistent with this video${preferences.enableBRoll ? '' : ' (SKIP - return an empty bRollSuggestions array)'}
 4. Dynamic zoom effects for engagement${preferences.enableZooms ? '' : ' (SKIP - disabled)'}
 5. Pacing analysis with hooks and slow sections
 
