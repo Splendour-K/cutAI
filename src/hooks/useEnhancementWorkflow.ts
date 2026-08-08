@@ -74,6 +74,7 @@ export function useEnhancementWorkflow({ projectId }: UseEnhancementWorkflowProp
           exit: 'fade',
           duration: 0.3,
         } : undefined,
+        graphic: s.graphic,
       }));
 
       updateWorkflow({ 
