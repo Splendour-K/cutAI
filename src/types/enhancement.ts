@@ -3,6 +3,58 @@
 export type EnhancementType = 'visual' | 'sfx' | 'graphic' | 'animation';
 export type EnhancementStatus = 'suggested' | 'approved' | 'rejected' | 'generating' | 'ready' | 'error';
 
+// Concrete motion-design primitives the engine can place and render
+export type GraphicType =
+  | 'animated-title'
+  | 'lower-third'
+  | 'icon'
+  | 'callout'
+  | 'arrow'
+  | 'highlight-box'
+  | 'progress-bar'
+  | 'chart'
+  | 'motion-graphic'
+  | 'zoom-emphasis'
+  | 'text-emphasis';
+
+export type GraphicAnchor =
+  | 'top-left' | 'top-center' | 'top-right'
+  | 'center-left' | 'center' | 'center-right'
+  | 'bottom-left' | 'bottom-center' | 'bottom-right';
+
+export interface ChartDataPoint {
+  label: string;
+  value: number;
+}
+
+// Everything a graphic needs to be rendered deterministically
+export interface GraphicSpec {
+  graphicType: GraphicType;
+  anchor?: GraphicAnchor;
+  // Text content
+  title?: string;
+  subtitle?: string;
+  label?: string;
+  // Icon (lucide name, kebab-case) for icon / callout / lower-third accents
+  icon?: string;
+  // arrow direction, in degrees (0 = pointing right)
+  arrowAngle?: number;
+  // progress-bar / chart data
+  progress?: number; // 0-100
+  chartType?: 'bar' | 'line' | 'donut';
+  chartData?: ChartDataPoint[];
+  chartUnit?: string;
+  // zoom-emphasis
+  zoomScale?: number;
+  focalPoint?: { x: number; y: number };
+  // highlight-box target region (percentages of frame)
+  box?: { x: number; y: number; width: number; height: number };
+  // Visual treatment
+  emphasisWords?: string[];
+  accent?: 'primary' | 'warning' | 'success' | 'neutral';
+  enterAnimation?: 'pop' | 'slide-up' | 'slide-left' | 'wipe' | 'fade' | 'draw' | 'count-up';
+}
+
 export interface Enhancement {
   id: string;
   type: EnhancementType;
@@ -40,6 +92,9 @@ export interface Enhancement {
     exit: string;
     duration: number;
   };
+
+  // Motion-design spec (present for type === 'graphic' | 'animation')
+  graphic?: GraphicSpec;
   
   // Metadata
   confidence: number; // 0-1, how confident AI is this enhancement fits
@@ -60,6 +115,7 @@ export interface EnhancementSuggestion {
   suggestedPrompt?: string; // For image/SFX generation
   position?: { x: number; y: number; scale: number };
   animationType?: string; // For animated graphics
+  graphic?: GraphicSpec;
 }
 
 export interface EnhancementAnalysis {
