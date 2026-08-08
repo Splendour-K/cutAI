@@ -7,12 +7,14 @@ import { VideoTimeline } from './VideoTimeline';
 import { DraggableCaptionOverlay } from './DraggableCaptionOverlay';
 import { ZoomEffectOverlay } from './ZoomEffectOverlay';
 import { BRollOverlay } from './BRollOverlay';
+import { GraphicsOverlay } from './GraphicsOverlay';
 import { ExcludedSectionOverlay } from './ExcludedSectionOverlay';
 import { cn } from '@/lib/utils';
 import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import type { VideoAnalysis } from '@/hooks/useVideoAnalysis';
 import type { EditDecisionList } from '@/types/autoEditor';
+import type { Enhancement } from '@/types/enhancement';
 import { useVideoZoomPreview } from '@/hooks/useVideoZoomPreview';
 import { useEditedPlayback } from '@/hooks/useEditedPlayback';
 import { useAudioDucking } from '@/hooks/useAudioDucking';
@@ -33,6 +35,7 @@ interface VideoPreviewProps {
   edl?: EditDecisionList | null;
   isPreviewingEdits?: boolean;
   onTogglePreviewEdits?: () => void;
+  enhancements?: Enhancement[];
 }
 
 export function VideoPreview({ 
@@ -51,6 +54,7 @@ export function VideoPreview({
   edl = null,
   isPreviewingEdits = false,
   onTogglePreviewEdits,
+  enhancements = [],
 }: VideoPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -248,6 +252,11 @@ export function VideoPreview({
         {/* Excluded Section Overlay */}
         {isPreviewingEdits && isInExcludedSection && (
           <ExcludedSectionOverlay />
+        )}
+
+        {/* Motion graphics / titles / charts */}
+        {enhancements.length > 0 && (
+          <GraphicsOverlay enhancements={enhancements} currentTime={currentTime} />
         )}
 
         {/* Draggable Caption Overlay */}
