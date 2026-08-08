@@ -339,6 +339,11 @@ function EnhancementCard({
             >
               {enhancement.category}
             </Badge>
+            {enhancement.graphic?.graphicType && (
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                {enhancement.graphic.graphicType.replace(/-/g, ' ')}
+              </Badge>
+            )}
             {enhancement.confidence >= 0.8 && (
               <span className="text-[10px] text-amber-500">★ High</span>
             )}

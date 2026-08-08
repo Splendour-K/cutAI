@@ -755,6 +755,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
             edl={autoEditor.workflow.edl}
             isPreviewingEdits={isPreviewingEdits}
             onTogglePreviewEdits={() => setIsPreviewingEdits(!isPreviewingEdits)}
+            enhancements={enhancementWorkflow.workflow.enhancements}
           />
         </div>
       </div>
