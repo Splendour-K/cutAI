@@ -2,13 +2,17 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { saveVideoLocally, generateAndCacheThumbnail } from '@/lib/localVideoStore';
+import { probeVideoMetadata } from '@/lib/videoAssets';
 import type { Platform } from '@/types/video';
 
 interface UploadResult {
   projectId: string;
   videoUrl: string;
+  cloudVideoUrl?: string;
   fileName: string;
 }
+
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
 
 export function useVideoUpload() {
   const [isUploading, setIsUploading] = useState(false);
@@ -23,37 +27,76 @@ export function useVideoUpload() {
     setUploadProgress(0);
 
     try {
-      // Check if user is authenticated
+      // Validate the file before touching any infrastructure
+      if (!file.type.startsWith('video/')) {
+        throw new Error('Please select a valid video file.');
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        throw new Error('This video is too large (max 2GB).');
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       const effectiveUserId = userId || user?.id;
 
       if (!effectiveUserId) {
-        // For demo purposes, create a temporary project without storage
+        // Unauthenticated preview only — nothing is persisted.
         const projectId = crypto.randomUUID();
         const videoUrl = URL.createObjectURL(file);
-        
-        // Save locally for persistence
+
         await saveVideoLocally(projectId, file).catch(() => {});
         generateAndCacheThumbnail(projectId, file).catch(() => {});
-        
+
         toast.success('Video loaded for preview');
         setUploadProgress(100);
-        
-        return {
-          projectId,
-          videoUrl,
-          fileName: file.name,
-        };
+
+        return { projectId, videoUrl, fileName: file.name };
       }
 
-      // Generate unique file path
+      setUploadProgress(5);
+
+      // 1. Create the project record first (status: uploading)
+      const title = file.name.replace(/\.[^/.]+$/, '');
+      const { data: project, error: projectError } = await supabase
+        .from('video_projects')
+        .insert({
+          user_id: effectiveUserId,
+          title,
+          platform,
+          content_type: ['youtube', 'linkedin'].includes(platform) ? 'long' : 'short',
+          aspect_ratio: platform === 'youtube' ? '16:9' : '9:16',
+          status: 'uploading',
+        })
+        .select()
+        .single();
+
+      if (projectError) throw new Error(projectError.message);
+
+      // 2. Create the asset record (status: uploading) — unique collision-proof path
       const fileExt = file.name.split('.').pop() || 'mp4';
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `${effectiveUserId}/${fileName}`;
+      const assetId = crypto.randomUUID();
+      const filePath = `${effectiveUserId}/projects/${project.id}/originals/${assetId}.${fileExt}`;
 
-      setUploadProgress(10);
+      const { error: assetError } = await supabase.from('video_assets').insert({
+        id: assetId,
+        project_id: project.id,
+        user_id: effectiveUserId,
+        kind: 'original',
+        storage_bucket: 'videos',
+        storage_path: filePath,
+        original_filename: file.name,
+        mime_type: file.type,
+        file_size_bytes: file.size,
+        status: 'uploading',
+      });
 
-      // Upload to storage
+      if (assetError) {
+        console.error('Asset record creation failed:', assetError);
+        // Non-fatal: continue upload, project.video_url remains the reference.
+      }
+
+      setUploadProgress(15);
+
+      // 3. Upload the original file to persistent cloud storage
       const { error: uploadError } = await supabase.storage
         .from('videos')
         .upload(filePath, file, {
@@ -63,48 +106,55 @@ export function useVideoUpload() {
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        throw new Error(uploadError.message);
+        // Mark the failure honestly — never leave a phantom "ready" asset.
+        await supabase.from('video_assets')
+          .update({ status: 'failed', error_message: uploadError.message })
+          .eq('id', assetId);
+        await supabase.from('video_projects')
+          .update({ status: 'failed' })
+          .eq('id', project.id);
+        throw new Error(`Upload failed: ${uploadError.message}. Please try again.`);
       }
 
-      setUploadProgress(60);
+      setUploadProgress(75);
 
-      // Get public URL
+      // 4. Confirm success: persist the cloud reference + probed metadata
       const { data: { publicUrl } } = supabase.storage
         .from('videos')
         .getPublicUrl(filePath);
 
-      setUploadProgress(70);
+      const meta = await probeVideoMetadata(file).catch(() => ({}));
 
-      // Create project record
-      const { data: project, error: projectError } = await supabase
-        .from('video_projects')
-        .insert({
-          user_id: effectiveUserId,
-          title: file.name.replace(/\.[^/.]+$/, ''),
-          video_url: publicUrl,
-          platform,
-          content_type: ['youtube', 'linkedin'].includes(platform) ? 'long' : 'short',
-          aspect_ratio: platform === 'youtube' ? '16:9' : '9:16',
-          status: 'ready',
-        })
-        .select()
-        .single();
-
-      if (projectError) {
-        console.error('Project creation error:', projectError);
-        throw new Error(projectError.message);
-      }
+      await Promise.all([
+        supabase.from('video_projects')
+          .update({
+            video_url: publicUrl,
+            status: 'ready',
+            duration_seconds: meta.duration ?? null,
+          })
+          .eq('id', project.id),
+        supabase.from('video_assets')
+          .update({
+            status: 'ready',
+            public_url: publicUrl,
+            duration_seconds: meta.duration ?? null,
+            width: meta.width ?? null,
+            height: meta.height ?? null,
+          })
+          .eq('id', assetId),
+      ]);
 
       setUploadProgress(100);
       toast.success('Video uploaded successfully!');
 
-      // Save locally for offline access
+      // 5. Local cache for performance only — cloud copy is the source of truth.
       await saveVideoLocally(project.id, file).catch(() => {});
       generateAndCacheThumbnail(project.id, file).catch(() => {});
 
       return {
         projectId: project.id,
         videoUrl: publicUrl,
+        cloudVideoUrl: publicUrl,
         fileName: file.name,
       };
 
@@ -133,43 +183,45 @@ export function useVideoUpload() {
 
   const deleteProject = useCallback(async (projectId: string, videoUrl?: string): Promise<boolean> => {
     try {
-      // Check if user is authenticated
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
-        // For demo/unauthenticated users, just return success
         toast.success('Video removed');
         return true;
       }
 
-      // Extract file path from URL if it's a storage URL
-      if (videoUrl && videoUrl.includes('supabase.co/storage')) {
+      // Collect every storage object for this project (originals + exports)
+      const paths = new Set<string>();
+
+      const { data: assets } = await supabase
+        .from('video_assets')
+        .select('storage_path')
+        .eq('project_id', projectId);
+      assets?.forEach((a) => a.storage_path && paths.add(a.storage_path));
+
+      // Backward compatibility: legacy projects only have the URL on the project row
+      if (videoUrl && videoUrl.includes('/storage/')) {
         const urlParts = videoUrl.split('/videos/');
-        if (urlParts[1]) {
-          const filePath = decodeURIComponent(urlParts[1]);
-          const { error: storageError } = await supabase.storage
-            .from('videos')
-            .remove([filePath]);
-          
-          if (storageError) {
-            console.error('Storage deletion error:', storageError);
-          }
-        }
+        if (urlParts[1]) paths.add(decodeURIComponent(urlParts[1].split('?')[0]));
       }
 
-      // Delete related records first (edit_history, video_analysis)
+      if (paths.size > 0) {
+        const { error: storageError } = await supabase.storage
+          .from('videos')
+          .remove([...paths]);
+        if (storageError) console.error('Storage deletion error:', storageError);
+      }
+
       await supabase.from('edit_history').delete().eq('project_id', projectId);
       await supabase.from('video_analysis').delete().eq('project_id', projectId);
+      await supabase.from('video_assets').delete().eq('project_id', projectId);
 
-      // Delete project record
       const { error: projectError } = await supabase
         .from('video_projects')
         .delete()
         .eq('id', projectId);
 
-      if (projectError) {
-        throw new Error(projectError.message);
-      }
+      if (projectError) throw new Error(projectError.message);
 
       toast.success('Video deleted successfully');
       return true;

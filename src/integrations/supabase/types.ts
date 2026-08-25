@@ -126,6 +126,81 @@ export type Database = {
           },
         ]
       }
+      video_assets: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          error_message: string | null
+          file_size_bytes: number | null
+          height: number | null
+          id: string
+          kind: string
+          mime_type: string | null
+          original_filename: string | null
+          project_id: string
+          public_url: string | null
+          status: string
+          storage_bucket: string
+          storage_path: string
+          updated_at: string
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          height?: number | null
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          project_id: string
+          public_url?: string | null
+          status?: string
+          storage_bucket?: string
+          storage_path: string
+          updated_at?: string
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          error_message?: string | null
+          file_size_bytes?: number | null
+          height?: number | null
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          project_id?: string
+          public_url?: string | null
+          status?: string
+          storage_bucket?: string
+          storage_path?: string
+          updated_at?: string
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_assets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_projects: {
         Row: {
           aspect_ratio: string
