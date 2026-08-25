@@ -66,6 +66,8 @@ export interface VideoProject {
   id: string;
   title: string;
   videoUrl: string;
+  /** Permanent cloud storage URL — the source of truth when videoUrl is a local blob. */
+  cloudVideoUrl?: string;
   videoFile?: File;
   createdAt: Date;
   duration: number;
