@@ -1,13 +1,13 @@
 import { useState, useCallback, useRef } from 'react';
 import { useProjects, type ProjectWithLocal } from '@/hooks/useProjects';
 import { useAuth } from '@/hooks/useAuth';
-import { getLocalVideo } from '@/lib/localVideoStore';
+import { resolveProjectVideo } from '@/lib/videoAssets';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import {
   Plus, Search, SortAsc, Clock, Trash2, Copy, Play,
-  Scissors, LogOut, Upload, AlertTriangle, Film, Loader2, Check, X,
+  Scissors, LogOut, Film, Loader2, Check, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -37,10 +37,9 @@ export function Dashboard({ onNewProject, onOpenProject }: DashboardProps) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortMode>('recent');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [reuploadTarget, setReuploadTarget] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = projects
     .filter((p) => p.title.toLowerCase().includes(search.toLowerCase()))
@@ -52,65 +51,49 @@ export function Dashboard({ onNewProject, onOpenProject }: DashboardProps) {
 
   const handleOpenProject = useCallback(
     async (proj: ProjectWithLocal) => {
-      if (!proj.hasLocalVideo) {
-        setReuploadTarget(proj.id);
-        return;
+      if (restoringId) return;
+
+      // Show a restoring state when the video must come from cloud storage
+      if (!proj.hasLocalVideo && proj.video_url) {
+        setRestoringId(proj.id);
       }
-      const file = await getLocalVideo(proj.id);
-      if (!file) {
-        setReuploadTarget(proj.id);
-        return;
+
+      try {
+        // Local cache first (performance), then cloud storage (source of truth)
+        const source = await resolveProjectVideo(proj.id, proj.video_url);
+
+        if (!source) {
+          // Genuine missing asset: no local copy AND no reachable cloud object
+          toast.error(
+            "We couldn't find the original video in cloud storage. Please upload the original video again."
+          );
+          return;
+        }
+
+        const config = PLATFORM_CONFIGS[proj.platform as Platform] || PLATFORM_CONFIGS.instagram;
+        const videoProject: VideoProject = {
+          id: proj.id,
+          title: proj.title,
+          videoUrl: source.videoUrl,
+          cloudVideoUrl: source.cloudVideoUrl,
+          videoFile: source.file,
+          createdAt: new Date(proj.created_at),
+          duration: proj.duration_seconds ? Number(proj.duration_seconds) : 0,
+          aspectRatio: (proj.aspect_ratio || config.aspectRatios[0]) as AspectRatio,
+          platform: proj.platform as Platform,
+          status: (['ready', 'in_progress', 'analyzing', 'processing', 'exporting'].includes(proj.status) ? proj.status : 'ready') as VideoProject['status'],
+          edits: [],
+          captions: (proj as any).caption_settings ? (proj as any).caption_settings : undefined,
+        };
+        onOpenProject(videoProject);
+      } catch (err) {
+        console.error('Failed to open project:', err);
+        toast.error('Failed to load the project video. Please check your connection and try again.');
+      } finally {
+        setRestoringId(null);
       }
-      const videoUrl = URL.createObjectURL(file);
-      const config = PLATFORM_CONFIGS[proj.platform as Platform] || PLATFORM_CONFIGS.instagram;
-      const videoProject: VideoProject = {
-        id: proj.id,
-        title: proj.title,
-        videoUrl,
-        videoFile: file,
-        createdAt: new Date(proj.created_at),
-        duration: proj.duration_seconds ? Number(proj.duration_seconds) : 0,
-        aspectRatio: (proj.aspect_ratio || config.aspectRatios[0]) as AspectRatio,
-        platform: proj.platform as Platform,
-        status: (['ready', 'in_progress', 'analyzing', 'processing', 'exporting'].includes(proj.status) ? proj.status : 'ready') as VideoProject['status'],
-        edits: [],
-        captions: (proj as any).caption_settings ? (proj as any).caption_settings : undefined,
-      };
-      onOpenProject(videoProject);
     },
-    [onOpenProject]
-  );
-
-  const handleReuploadFile = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file || !reuploadTarget) return;
-      const proj = projects.find((p) => p.id === reuploadTarget);
-      if (!proj) return;
-
-      // Save locally and open
-      const { saveVideoLocally } = await import('@/lib/localVideoStore');
-      await saveVideoLocally(reuploadTarget, file);
-      setReuploadTarget(null);
-
-      const videoUrl = URL.createObjectURL(file);
-      const config = PLATFORM_CONFIGS[proj.platform as Platform] || PLATFORM_CONFIGS.instagram;
-      const videoProject: VideoProject = {
-        id: proj.id,
-        title: proj.title,
-        videoUrl,
-        videoFile: file,
-        createdAt: new Date(proj.created_at),
-        duration: proj.duration_seconds ? Number(proj.duration_seconds) : 0,
-        aspectRatio: (proj.aspect_ratio || config.aspectRatios[0]) as AspectRatio,
-        platform: proj.platform as Platform,
-        status: 'analyzing',
-        edits: [],
-        captions: (proj as any).caption_settings ? (proj as any).caption_settings : undefined,
-      };
-      onOpenProject(videoProject);
-    },
-    [reuploadTarget, projects, onOpenProject]
+    [onOpenProject, restoringId]
   );
 
   const formatDate = (d: string) => {
@@ -222,11 +205,11 @@ export function Dashboard({ onNewProject, onOpenProject }: DashboardProps) {
                       <Film className="w-8 h-8 text-muted-foreground/30" />
                     </div>
                   )}
-                  {!proj.hasLocalVideo && (
+                  {restoringId === proj.id && (
                     <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                      <div className="flex items-center gap-1.5 text-xs text-warning">
-                        <AlertTriangle className="w-4 h-4" />
-                        Re-upload needed
+                      <div className="flex items-center gap-1.5 text-xs text-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Restoring your video…
                       </div>
                     </div>
                   )}
@@ -344,32 +327,6 @@ export function Dashboard({ onNewProject, onOpenProject }: DashboardProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Re-upload dialog */}
-      <AlertDialog open={!!reuploadTarget} onOpenChange={() => setReuploadTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Video file missing</AlertDialogTitle>
-            <AlertDialogDescription>
-              The local video file was cleared from your browser cache. Please re-upload the original video to continue editing this project.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => fileInputRef.current?.click()}>
-              <Upload className="w-4 h-4 mr-2" />
-              Re-upload Video
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="video/*"
-        className="hidden"
-        onChange={handleReuploadFile}
-      />
     </div>
   );
 }
