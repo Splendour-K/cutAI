@@ -212,7 +212,7 @@ export function UploadZone({ onUpload, isUploading, uploadProgress, onBackToDash
 
             <div className="mx-5 border-t border-border/30" />
 
-            <div className="flex items-center justify-between p-4">
+            <div className="flex items-center justify-end p-4">
               <Button
                 variant="secondary"
                 size="sm"
@@ -223,7 +223,7 @@ export function UploadZone({ onUpload, isUploading, uploadProgress, onBackToDash
                 {isUploading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {uploadProgress ? `${uploadProgress}%` : 'Uploading...'}
+                    {uploadProgress ? `Uploading ${uploadProgress}%` : 'Uploading...'}
                   </>
                 ) : (
                   <>
@@ -231,16 +231,6 @@ export function UploadZone({ onUpload, isUploading, uploadProgress, onBackToDash
                     Upload Video
                   </>
                 )}
-              </Button>
-
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleDemoClick}
-                className="gap-2"
-              >
-                <Scissors className="w-4 h-4" />
-                Try Demo
               </Button>
             </div>
           </div>
