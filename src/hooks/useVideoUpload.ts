@@ -123,7 +123,8 @@ export function useVideoUpload() {
         .from('videos')
         .getPublicUrl(filePath);
 
-      const meta = await probeVideoMetadata(file).catch(() => ({}));
+      const meta: { duration?: number; width?: number; height?: number } =
+        await probeVideoMetadata(file).catch(() => ({}));
 
       await Promise.all([
         supabase.from('video_projects')
