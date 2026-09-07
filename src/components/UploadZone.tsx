@@ -38,7 +38,7 @@ const EXAMPLE_PROMPTS = {
   ]
 };
 
-export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress, onBackToDashboard }: UploadZoneProps) {
+export function UploadZone({ onUpload, isUploading, uploadProgress, onBackToDashboard }: UploadZoneProps) {
   const { user, signOut } = useAuth();
   const [prompt, setPrompt] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -109,9 +109,6 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress, onBa
     requireAuth(() => fileInputRef.current?.click());
   };
 
-  const handleDemoClick = () => {
-    requireAuth(() => onDemo?.(selectedPlatform));
-  };
 
   const currentExamples = isLongForm ? EXAMPLE_PROMPTS.long : EXAMPLE_PROMPTS.short;
 
