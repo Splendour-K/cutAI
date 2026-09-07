@@ -89,7 +89,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const animationWorkflow = useAnimationWorkflow({
     projectId: project.id,
     videoFile: project.videoFile,
-    videoUrl: project.videoUrl,
+    videoUrl: project.cloudVideoUrl || project.videoUrl,
   });
 
   // Brand presets
@@ -121,7 +121,6 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const captionSettingsRef = useRef(captionSettings);
   captionSettingsRef.current = captionSettings;
   useEffect(() => {
-    if (project.id === 'demo') return;
     autoSaveRef.current = setInterval(async () => {
       try {
         await supabase
@@ -139,7 +138,6 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
 
   // Load edit history on mount
   useEffect(() => {
-    if (project.id === 'demo') return;
     supabase
       .from('edit_history')
       .select('*')
@@ -162,7 +160,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const handleDelete = useCallback(async () => {
     setIsDeleting(true);
     try {
-      const success = await deleteProject(project.id, project.videoUrl);
+      const success = await deleteProject(project.id, project.cloudVideoUrl || project.videoUrl);
       if (success) {
         onBack();
       }
@@ -187,8 +185,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
           // No existing analysis — show overlay and generate
           setIsAnalyzing(true);
           setHasCheckedExisting(true);
-          const skipPersistence = project.videoUrl.startsWith('blob:') ? true : false;
-          generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+          const serverUrl = project.cloudVideoUrl || (project.videoUrl.startsWith('blob:') ? undefined : project.videoUrl);
+          generateCaptions(project.id, project.videoFile, serverUrl, !serverUrl);
         } else {
           setHasCheckedExisting(true);
           setIsAnalyzing(false);
@@ -277,8 +275,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
           
           const hasTranscript = analysis?.transcription && analysis.transcription.segments?.length > 0;
           if (!hasTranscript && project.id) {
-            const skipPersistence = project.videoUrl?.startsWith('blob:') ?? false;
-            generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+            const serverUrl = project.cloudVideoUrl || (project.videoUrl?.startsWith('blob:') ? undefined : project.videoUrl);
+            generateCaptions(project.id, project.videoFile, serverUrl, !serverUrl);
           }
           
           toast.success('Captions enabled! Customize the style in the Captions tab.');
@@ -329,7 +327,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     if (!project.id) return;
     
     try {
-      await analyzeVideo(project.id, project.videoFile, project.videoUrl);
+      await analyzeVideo(project.id, project.videoFile, project.cloudVideoUrl || project.videoUrl);
     } catch (error) {
       console.error('Analysis failed:', error);
     }
@@ -339,8 +337,8 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     if (!project.id) return;
     
     try {
-      const skipPersistence = project.videoUrl?.startsWith('blob:') ?? false;
-      await generateCaptions(project.id, project.videoFile, project.videoUrl, skipPersistence);
+      const serverUrl = project.cloudVideoUrl || (project.videoUrl?.startsWith('blob:') ? undefined : project.videoUrl);
+      await generateCaptions(project.id, project.videoFile, serverUrl, !serverUrl);
       setCaptionSettings(prev => ({ ...prev, enabled: true }));
       setActiveTab('captions');
       toast.success('Captions generated! Choose a style to customize.');
@@ -362,7 +360,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
       autoEditor.workflow.edl,
       project.videoUrl,
       `${project.title.replace(/\s+/g, '_')}_edited.webm`,
-      { quality }
+      { quality, projectId: project.id }
     );
   }, [project.videoUrl, project.title, autoEditor.workflow.edl, downloadRenderedVideo]);
 
