@@ -14,7 +14,6 @@ const PENDING_PLATFORM_KEY = 'clipzy_pending_platform';
 
 interface UploadZoneProps {
   onUpload: (file: File, platform: Platform, initialPrompt?: string) => void;
-  onDemo?: (platform: Platform) => void;
   isUploading?: boolean;
   uploadProgress?: number;
   onBackToDashboard?: () => void;

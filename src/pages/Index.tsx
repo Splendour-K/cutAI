@@ -7,8 +7,6 @@ import { useAuth } from '@/hooks/useAuth';
 import type { VideoProject, Platform, AspectRatio } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 
-const SAMPLE_VIDEO = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
-
 type View = 'dashboard' | 'upload' | 'editor';
 
 const Index = () => {
@@ -33,6 +31,7 @@ const Index = () => {
       id: result.projectId,
       title: result.fileName.replace(/\.[^/.]+$/, ''),
       videoUrl: result.videoUrl,
+      cloudVideoUrl: result.cloudVideoUrl,
       videoFile: file,
       createdAt: new Date(),
       duration: 0,
@@ -46,25 +45,8 @@ const Index = () => {
     setView('editor');
   }, [uploadVideo]);
 
-  const handleDemoMode = useCallback((platform: Platform = 'instagram') => {
-    const config = PLATFORM_CONFIGS[platform];
-    const demoProject: VideoProject = {
-      id: 'demo',
-      title: 'My Talking Head Video',
-      videoUrl: SAMPLE_VIDEO,
-      createdAt: new Date(),
-      duration: 15,
-      aspectRatio: config.aspectRatios[0] as AspectRatio,
-      platform,
-      status: 'analyzing',
-      edits: [],
-    };
-    setProject(demoProject);
-    setView('editor');
-  }, []);
-
   const handleBack = useCallback(() => {
-    if (project?.videoUrl && project.videoUrl !== SAMPLE_VIDEO && project.videoUrl.startsWith('blob:')) {
+    if (project?.videoUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(project.videoUrl);
     }
     setProject(null);
@@ -90,7 +72,6 @@ const Index = () => {
   return (
     <UploadZone
       onUpload={handleUpload}
-      onDemo={handleDemoMode}
       isUploading={isUploading}
       uploadProgress={uploadProgress}
       onBackToDashboard={user ? () => setView('dashboard') : undefined}
