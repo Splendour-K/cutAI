@@ -172,11 +172,17 @@ export function useVideoAnalysis() {
       if (videoFile && !hasValidUrl) {
         toast.info('Uploading video for processing...');
         
-        // Generate a unique filename
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('Please sign in to process this video.');
+        }
+
+        // User-scoped, collision-proof path (matches storage authorization rules)
         const fileExtension = videoFile.name.split('.').pop() || 'mp4';
-        const fileName = `caption_${projectId}_${Date.now()}.${fileExtension}`;
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const assetId = crypto.randomUUID();
+        const fileName = `${user.id}/projects/${projectId}/originals/${assetId}.${fileExtension}`;
+
+        const { error: uploadError } = await supabase.storage
           .from('videos')
           .upload(fileName, videoFile, {
             cacheControl: '3600',
@@ -192,9 +198,29 @@ export function useVideoAnalysis() {
         const { data: urlData } = supabase.storage
           .from('videos')
           .getPublicUrl(fileName);
-        
+
         finalVideoUrl = urlData.publicUrl;
-        console.log('Video uploaded successfully:', finalVideoUrl);
+
+        // Persist it as the project's original so the video survives cache clears
+        await supabase.from('video_assets').insert({
+          id: assetId,
+          project_id: projectId,
+          user_id: user.id,
+          kind: 'original',
+          storage_bucket: 'videos',
+          storage_path: fileName,
+          public_url: urlData.publicUrl,
+          original_filename: videoFile.name,
+          mime_type: videoFile.type,
+          file_size_bytes: videoFile.size,
+          status: 'ready',
+        });
+
+        await supabase
+          .from('video_projects')
+          .update({ video_url: urlData.publicUrl })
+          .eq('id', projectId)
+          .is('video_url', null);
       } else if (!hasValidUrl && !videoFile) {
         throw new Error("No video file or valid URL available. Please upload a video first.");
       }
