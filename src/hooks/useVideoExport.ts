@@ -72,7 +72,7 @@ export function useVideoExport() {
   const renderVideoWithEffects = useCallback(async (
     edl: EditDecisionList,
     sourceVideoUrl: string,
-    options: { quality: 'draft' | 'standard' | 'high' } = { quality: 'standard' }
+    options: { quality: 'draft' | 'standard' | 'high'; projectId?: string } = { quality: 'standard' }
   ): Promise<Blob | null> => {
     setIsExporting(true);
     setRenderProgress({ stage: 'preparing', progress: 0, message: 'Preparing video & audio...' });
@@ -371,6 +371,7 @@ export function useVideoExport() {
     exportAsEDL,
     renderVideoWithEffects,
     downloadRenderedVideo,
+    persistExport,
   };
 }
 
