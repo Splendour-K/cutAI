@@ -14,7 +14,6 @@ const PENDING_PLATFORM_KEY = 'clipzy_pending_platform';
 
 interface UploadZoneProps {
   onUpload: (file: File, platform: Platform, initialPrompt?: string) => void;
-  onDemo?: (platform: Platform) => void;
   isUploading?: boolean;
   uploadProgress?: number;
   onBackToDashboard?: () => void;
@@ -39,7 +38,7 @@ const EXAMPLE_PROMPTS = {
   ]
 };
 
-export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress, onBackToDashboard }: UploadZoneProps) {
+export function UploadZone({ onUpload, isUploading, uploadProgress, onBackToDashboard }: UploadZoneProps) {
   const { user, signOut } = useAuth();
   const [prompt, setPrompt] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -110,9 +109,6 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress, onBa
     requireAuth(() => fileInputRef.current?.click());
   };
 
-  const handleDemoClick = () => {
-    requireAuth(() => onDemo?.(selectedPlatform));
-  };
 
   const currentExamples = isLongForm ? EXAMPLE_PROMPTS.long : EXAMPLE_PROMPTS.short;
 
@@ -216,7 +212,7 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress, onBa
 
             <div className="mx-5 border-t border-border/30" />
 
-            <div className="flex items-center justify-between p-4">
+            <div className="flex items-center justify-end p-4">
               <Button
                 variant="secondary"
                 size="sm"
@@ -227,7 +223,7 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress, onBa
                 {isUploading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {uploadProgress ? `${uploadProgress}%` : 'Uploading...'}
+                    {uploadProgress ? `Uploading ${uploadProgress}%` : 'Uploading...'}
                   </>
                 ) : (
                   <>
@@ -235,16 +231,6 @@ export function UploadZone({ onUpload, onDemo, isUploading, uploadProgress, onBa
                     Upload Video
                   </>
                 )}
-              </Button>
-
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleDemoClick}
-                className="gap-2"
-              >
-                <Scissors className="w-4 h-4" />
-                Try Demo
               </Button>
             </div>
           </div>

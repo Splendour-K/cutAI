@@ -72,7 +72,7 @@ export function useVideoExport() {
   const renderVideoWithEffects = useCallback(async (
     edl: EditDecisionList,
     sourceVideoUrl: string,
-    options: { quality: 'draft' | 'standard' | 'high' } = { quality: 'standard' }
+    options: { quality: 'draft' | 'standard' | 'high'; projectId?: string } = { quality: 'standard' }
   ): Promise<Blob | null> => {
     setIsExporting(true);
     setRenderProgress({ stage: 'preparing', progress: 0, message: 'Preparing video & audio...' });
@@ -279,12 +279,70 @@ export function useVideoExport() {
     }
   }, []);
 
-  // Download rendered video
+  /**
+   * Persist a finished export to cloud storage so it survives cache clears
+   * and is available from any device.
+   */
+  const persistExport = useCallback(async (
+    projectId: string,
+    blob: Blob,
+    filename: string
+  ): Promise<string | null> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const exportId = crypto.randomUUID();
+      const storagePath = `${user.id}/projects/${projectId}/exports/${exportId}/${filename}`;
+
+      const { error: assetError } = await supabase.from('video_assets').insert({
+        id: exportId,
+        project_id: projectId,
+        user_id: user.id,
+        kind: 'export',
+        storage_bucket: 'videos',
+        storage_path: storagePath,
+        original_filename: filename,
+        mime_type: blob.type || 'video/webm',
+        file_size_bytes: blob.size,
+        status: 'uploading',
+      });
+      if (assetError) console.error('Export asset record failed:', assetError);
+
+      const { error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(storagePath, blob, { cacheControl: '3600', upsert: false });
+
+      if (uploadError) {
+        console.error('Export upload failed:', uploadError);
+        await supabase.from('video_assets')
+          .update({ status: 'failed', error_message: uploadError.message })
+          .eq('id', exportId);
+        toast.error('Your export downloaded, but saving it to the cloud failed.');
+        return null;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('videos')
+        .getPublicUrl(storagePath);
+
+      await supabase.from('video_assets')
+        .update({ status: 'ready', public_url: publicUrl })
+        .eq('id', exportId);
+
+      return publicUrl;
+    } catch (err) {
+      console.error('Export persistence failed:', err);
+      return null;
+    }
+  }, []);
+
+  // Download rendered video (and save a permanent copy to the cloud)
   const downloadRenderedVideo = useCallback(async (
     edl: EditDecisionList,
     sourceVideoUrl: string,
     filename: string = 'edited-video.webm',
-    options?: { quality: 'draft' | 'standard' | 'high' }
+    options?: { quality: 'draft' | 'standard' | 'high'; projectId?: string }
   ) => {
     const blob = await renderVideoWithEffects(edl, sourceVideoUrl, options);
 
@@ -299,8 +357,13 @@ export function useVideoExport() {
       URL.revokeObjectURL(url);
 
       toast.success('Video exported successfully!');
+
+      const projectId = options?.projectId || edl.projectId;
+      if (projectId) {
+        await persistExport(projectId, blob, filename);
+      }
     }
-  }, [renderVideoWithEffects]);
+  }, [renderVideoWithEffects, persistExport]);
 
   return {
     isExporting,
@@ -308,6 +371,7 @@ export function useVideoExport() {
     exportAsEDL,
     renderVideoWithEffects,
     downloadRenderedVideo,
+    persistExport,
   };
 }
 
