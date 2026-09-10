@@ -551,13 +551,28 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 )}
               </TabsTrigger>
 
+              <span className="ml-auto mr-1 text-[10px] text-muted-foreground flex items-center gap-1">
+                {saveState === 'saving' && (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" /> Saving
+                  </>
+                )}
+                {saveState === 'saved' && lastSavedAt && (
+                  <>
+                    <Check className="w-3 h-3 text-green-500" /> Saved
+                  </>
+                )}
+                {saveState === 'error' && <span className="text-destructive">Not saved</span>}
+              </span>
+
+
               {/* More tools dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className={cn(
                     "inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium transition-colors",
                     "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                    ['analysis', 'history', 'versions', 'animate', 'ai-editor', 'settings'].includes(activeTab) && "bg-muted text-foreground"
+                    ['analysis', 'history', 'versions', 'exports', 'animate', 'ai-editor', 'settings'].includes(activeTab) && "bg-muted text-foreground"
                   )}>
                     <Settings2 className="w-3.5 h-3.5" />
                     More
