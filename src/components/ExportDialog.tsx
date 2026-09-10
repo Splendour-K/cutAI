@@ -38,10 +38,28 @@ const FORMAT_OPTIONS: { id: ExportFormat; label: string; description: string; ic
   { id: 'fcpxml', label: 'FCPXML', description: 'Final Cut Pro X project file', icon: <FileText className="w-5 h-5" />, group: 'file' },
 ];
 
-const QUALITY_OPTIONS: { id: ExportQuality; label: string; description: string }[] = [
-  { id: 'draft', label: 'Draft', description: '50% resolution, fast' },
-  { id: 'standard', label: 'Standard', description: '75% resolution, balanced' },
-  { id: 'high', label: 'High', description: 'Full resolution, slower' },
+const RESOLUTION_OPTIONS: { id: ExportResolution; label: string }[] = [
+  { id: 'source', label: 'Same as original' },
+  { id: '2160p', label: '4K · 2160p' },
+  { id: '1440p', label: 'QHD · 1440p' },
+  { id: '1080p', label: 'Full HD · 1080p' },
+  { id: '720p', label: 'HD · 720p' },
+  { id: '480p', label: 'Small · 480p' },
+];
+
+const VIDEO_BITRATE_OPTIONS: { value: number; label: string }[] = [
+  { value: 2_000_000, label: 'Light · 2 Mbps (smallest file)' },
+  { value: 4_000_000, label: 'Balanced · 4 Mbps' },
+  { value: 8_000_000, label: 'Sharp · 8 Mbps' },
+  { value: 16_000_000, label: 'Very sharp · 16 Mbps' },
+  { value: 30_000_000, label: 'Maximum · 30 Mbps (largest file)' },
+];
+
+const AUDIO_BITRATE_OPTIONS: { value: number; label: string }[] = [
+  { value: 96_000, label: 'Voice · 96 kbps' },
+  { value: 128_000, label: 'Standard · 128 kbps' },
+  { value: 192_000, label: 'High · 192 kbps' },
+  { value: 256_000, label: 'Studio · 256 kbps' },
 ];
 
 export function ExportDialog({
