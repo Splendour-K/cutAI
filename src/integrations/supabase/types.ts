@@ -76,6 +76,50 @@ export type Database = {
         }
         Relationships: []
       }
+      project_versions: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          note: string | null
+          project_id: string
+          snapshot: Json
+          updated_at: string
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label?: string
+          note?: string | null
+          project_id: string
+          snapshot?: Json
+          updated_at?: string
+          user_id: string
+          version_number: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          note?: string | null
+          project_id?: string
+          snapshot?: Json
+          updated_at?: string
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_versions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_analysis: {
         Row: {
           analysis_status: string
