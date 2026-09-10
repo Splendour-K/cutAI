@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Download, FileJson, FileText, Film, Loader2, Check, X } from 'lucide-react';
+import { Download, FileJson, FileText, Film, Loader2, Check, X, Copy, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import {
   Dialog,
@@ -24,6 +25,8 @@ interface ExportDialogProps {
   renderProgress: RenderProgress | null;
   hasEDL: boolean;
   hasVideo: boolean;
+  /** Public link to the most recent cloud-saved export. */
+  shareUrl?: string | null;
 }
 
 const FORMAT_OPTIONS: { id: ExportFormat; label: string; description: string; icon: React.ReactNode; group: 'render' | 'file' }[] = [
@@ -96,10 +99,38 @@ export function ExportDialog({
             <p className="text-xs text-muted-foreground text-center">
               {renderProgress.stage === 'preparing' && 'Loading source video...'}
               {renderProgress.stage === 'rendering' && 'Processing frames with effects...'}
-              {renderProgress.stage === 'encoding' && 'Finalizing video file...'}
-              {renderProgress.stage === 'complete' && 'Your file has been downloaded.'}
+              {renderProgress.stage === 'encoding' && 'Saving your video to the cloud...'}
+              {renderProgress.stage === 'complete' && 'Your file downloaded and is saved in the cloud.'}
               {renderProgress.stage === 'error' && 'Something went wrong. Please try again.'}
             </p>
+
+            {isComplete && shareUrl && (
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                  <LinkIcon className="w-3.5 h-3.5 text-primary" />
+                  Share link
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input readOnly value={shareUrl} className="h-8 text-xs" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 shrink-0"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(shareUrl);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Anyone with this link can watch your edited video.
+                </p>
+              </div>
+            )}
+
             {(isComplete || isError) && (
               <Button
                 variant="outline"
