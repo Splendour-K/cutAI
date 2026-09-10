@@ -215,27 +215,59 @@ export function ExportDialog({
               ))}
             </div>
 
-            {/* Quality selector (only for video) */}
+            {/* Quality settings (only for video) */}
             {selectedFormat === 'video' && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quality</p>
-                <div className="flex gap-2">
-                  {QUALITY_OPTIONS.map((q) => (
-                    <button
-                      key={q.id}
-                      onClick={() => setSelectedQuality(q.id)}
-                      className={cn(
-                        'flex-1 p-2 rounded-lg border text-center transition-colors',
-                        selectedQuality === q.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-muted-foreground/30'
-                      )}
-                    >
-                      <p className="text-sm font-medium text-foreground">{q.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{q.description}</p>
-                    </button>
-                  ))}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Picture size</label>
+                  <Select
+                    value={settings.resolution}
+                    onValueChange={(v) => setSettings((s) => ({ ...s, resolution: v as ExportResolution }))}
+                  >
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {RESOLUTION_OPTIONS.map((r) => (
+                        <SelectItem key={r.id} value={r.id} className="text-sm">{r.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Picture quality</label>
+                  <Select
+                    value={String(settings.videoBitrate)}
+                    onValueChange={(v) => setSettings((s) => ({ ...s, videoBitrate: Number(v) }))}
+                  >
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {VIDEO_BITRATE_OPTIONS.map((b) => (
+                        <SelectItem key={b.value} value={String(b.value)} className="text-sm">{b.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Sound quality</label>
+                  <Select
+                    value={String(settings.audioBitrate)}
+                    onValueChange={(v) => setSettings((s) => ({ ...s, audioBitrate: Number(v) }))}
+                  >
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {AUDIO_BITRATE_OPTIONS.map((a) => (
+                        <SelectItem key={a.value} value={String(a.value)} className="text-sm">{a.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  Bigger sizes and higher quality take longer to render and make a larger file.
+                </p>
               </div>
             )}
 
