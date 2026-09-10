@@ -9,6 +9,14 @@ export interface RenderProgress {
   message: string;
 }
 
+export interface PersistedExport {
+  publicUrl: string;
+  storagePath: string;
+  filename: string;
+  mimeType: string;
+  fileSizeBytes: number;
+}
+
 interface ExportOptions {
   format: 'edl' | 'json' | 'premiere' | 'fcpxml' | 'video';
   quality: 'draft' | 'standard' | 'high';
@@ -287,7 +295,7 @@ export function useVideoExport() {
     projectId: string,
     blob: Blob,
     filename: string
-  ): Promise<string | null> => {
+  ): Promise<PersistedExport | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
@@ -330,39 +338,51 @@ export function useVideoExport() {
         .update({ status: 'ready', public_url: publicUrl })
         .eq('id', exportId);
 
-      return publicUrl;
+      return {
+        publicUrl,
+        storagePath,
+        filename,
+        mimeType: blob.type || 'video/webm',
+        fileSizeBytes: blob.size,
+      };
     } catch (err) {
       console.error('Export persistence failed:', err);
       return null;
     }
   }, []);
 
-  // Download rendered video (and save a permanent copy to the cloud)
+  // Download rendered video (and save a permanent, shareable copy to the cloud)
   const downloadRenderedVideo = useCallback(async (
     edl: EditDecisionList,
     sourceVideoUrl: string,
     filename: string = 'edited-video.webm',
     options?: { quality: 'draft' | 'standard' | 'high'; projectId?: string }
-  ) => {
+  ): Promise<PersistedExport | null> => {
     const blob = await renderVideoWithEffects(edl, sourceVideoUrl, options);
+    if (!blob) return null;
 
-    if (blob) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-      toast.success('Video exported successfully!');
+    toast.success('Video exported successfully!');
 
-      const projectId = options?.projectId || edl.projectId;
-      if (projectId) {
-        await persistExport(projectId, blob, filename);
-      }
-    }
+    const projectId = options?.projectId || edl.projectId;
+    if (!projectId) return null;
+
+    setRenderProgress({ stage: 'encoding', progress: 97, message: 'Uploading to the cloud...' });
+    const persisted = await persistExport(projectId, blob, filename);
+    setRenderProgress({
+      stage: 'complete',
+      progress: 100,
+      message: persisted ? 'Export saved & shareable link ready' : 'Export complete!',
+    });
+    return persisted;
   }, [renderVideoWithEffects, persistExport]);
 
   return {

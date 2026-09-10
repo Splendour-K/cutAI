@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { ChatPanel } from './ChatPanel';
@@ -7,6 +7,9 @@ import { EditorHeader } from './EditorHeader';
 import { AnalyzingOverlay } from './AnalyzingOverlay';
 import { EditHistory } from './EditHistory';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
+import { ExportHistoryPanel } from './ExportHistoryPanel';
+import { useProjectExports, type ProjectExport } from '@/hooks/useProjectExports';
+import { useEditorAutosave, loadEditorState, type EditorState } from '@/hooks/useEditorAutosave';
 import { useProjectVersions, type ProjectVersion, type ProjectVersionSnapshot } from '@/hooks/useProjectVersions';
 import { CaptionEditorPanel } from './CaptionEditorPanel';
 import { AIEditorPanel } from './AIEditorPanel';
@@ -21,7 +24,7 @@ import { useVideoExport } from '@/hooks/useVideoExport';
 import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles, Film, ChevronDown, Layers } from 'lucide-react';
+import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles, Film, ChevronDown, Layers, Share2, Check } from 'lucide-react';
 import { AnimationWorkflowPanel } from './AnimationWorkflowPanel';
 import { useAnimationWorkflow } from '@/hooks/useAnimationWorkflow';
 import { useBrandPresets } from '@/hooks/useBrandPresets';
@@ -167,25 +170,58 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const { deleteProject } = useVideoUpload();
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Auto-save every 2 minutes (includes caption settings)
-  const autoSaveRef = useRef<ReturnType<typeof setInterval>>();
-  const captionSettingsRef = useRef(captionSettings);
-  captionSettingsRef.current = captionSettings;
+  // Saved exports (cloud, shareable)
+  const projectExports = useProjectExports(project.id);
+  const [lastShareUrl, setLastShareUrl] = useState<string | null>(null);
+
+  // --- Continuous cloud autosave of the working editor state ---
+  const [isHydrated, setIsHydrated] = useState(false);
+
   useEffect(() => {
-    autoSaveRef.current = setInterval(async () => {
-      try {
-        await supabase
-          .from('video_projects')
-          .update({
-            updated_at: new Date().toISOString(),
-            status: 'in_progress',
-            caption_settings: captionSettingsRef.current as any,
-          })
-          .eq('id', project.id);
-      } catch {}
-    }, 120_000);
-    return () => clearInterval(autoSaveRef.current);
+    let cancelled = false;
+    loadEditorState(project.id).then((state) => {
+      if (cancelled) {
+        return;
+      }
+      if (state) {
+        if (state.captions) setCaptionSettings(state.captions);
+        setEditedCaptions(state.editedCaptions || {});
+        if (state.edl) {
+          autoEditor.loadEDL(state.edl);
+          setIsPreviewingEdits(true);
+        }
+        if (state.enhancements?.length) enhancementWorkflow.loadEnhancements(state.enhancements);
+        setProject((prev) => ({
+          ...prev,
+          playbackRate: state.playbackRate ?? 1,
+          aspectRatio: state.aspectRatio || prev.aspectRatio,
+        }));
+      }
+      setIsHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id]);
+
+  const editorState = useMemo<EditorState>(() => ({
+    edl: autoEditor.workflow.edl,
+    enhancements: enhancementWorkflow.workflow.enhancements,
+    editedCaptions,
+    captions: captionSettings,
+    playbackRate: project.playbackRate ?? 1,
+    aspectRatio: project.aspectRatio,
+  }), [
+    autoEditor.workflow.edl,
+    enhancementWorkflow.workflow.enhancements,
+    editedCaptions,
+    captionSettings,
+    project.playbackRate,
+    project.aspectRatio,
+  ]);
+
+  const { saveState, lastSavedAt } = useEditorAutosave(project.id, editorState, isHydrated);
 
   // Load edit history on mount
   useEffect(() => {
@@ -402,18 +438,47 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     setShowExportDialog(true);
   }, []);
 
-  const handleExportVideo = useCallback((quality: 'draft' | 'standard' | 'high') => {
-    if (!project.videoUrl || !autoEditor.workflow.edl) {
+  const handleExportVideo = useCallback(async (quality: 'draft' | 'standard' | 'high') => {
+    const edl = autoEditor.workflow.edl;
+    if (!project.videoUrl || !edl) {
       toast.error('No edited video to export. Run the auto-editor or make chat edits first.');
       return;
     }
-    downloadRenderedVideo(
-      autoEditor.workflow.edl,
+    setLastShareUrl(null);
+    const persisted = await downloadRenderedVideo(
+      edl,
       project.videoUrl,
       `${project.title.replace(/\s+/g, '_')}_edited.webm`,
       { quality, projectId: project.id }
     );
-  }, [project.videoUrl, project.title, autoEditor.workflow.edl, downloadRenderedVideo]);
+    if (persisted) {
+      setLastShareUrl(persisted.publicUrl);
+      await projectExports.recordExport({
+        ...persisted,
+        quality,
+        durationSeconds: edl.editedDuration ?? null,
+        label: `${project.title} · ${quality}`,
+        snapshot: buildSnapshot(),
+      });
+      toast.success('Export saved to the cloud — share link ready');
+    }
+  }, [project.videoUrl, project.title, project.id, autoEditor.workflow.edl, downloadRenderedVideo, projectExports, buildSnapshot]);
+
+  const handleRestoreExport = useCallback((exp: ProjectExport) => {
+    if (!exp.snapshot) {
+      toast.error('This export has no saved edit settings');
+      return;
+    }
+    handleRestoreVersion({
+      id: exp.id,
+      project_id: exp.project_id,
+      version_number: exp.version_number,
+      label: exp.label,
+      note: null,
+      snapshot: exp.snapshot,
+      created_at: exp.created_at,
+    });
+  }, [handleRestoreVersion]);
 
   const handleExportEDL = useCallback((format: 'edl' | 'json' | 'premiere' | 'fcpxml') => {
     if (!autoEditor.workflow.edl) {
@@ -457,6 +522,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
         renderProgress={renderProgress}
         hasEDL={!!autoEditor.workflow.edl}
         hasVideo={!!project.videoUrl}
+        shareUrl={lastShareUrl}
       />
 
       <EditorHeader project={project} onBack={onBack} onExport={handleExport} onDelete={handleDelete} isDeleting={isDeleting} />
@@ -485,13 +551,28 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 )}
               </TabsTrigger>
 
+              <span className="ml-auto mr-1 text-[10px] text-muted-foreground flex items-center gap-1">
+                {saveState === 'saving' && (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" /> Saving
+                  </>
+                )}
+                {saveState === 'saved' && lastSavedAt && (
+                  <>
+                    <Check className="w-3 h-3 text-green-500" /> Saved
+                  </>
+                )}
+                {saveState === 'error' && <span className="text-destructive">Not saved</span>}
+              </span>
+
+
               {/* More tools dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className={cn(
                     "inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium transition-colors",
                     "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                    ['analysis', 'history', 'versions', 'animate', 'ai-editor', 'settings'].includes(activeTab) && "bg-muted text-foreground"
+                    ['analysis', 'history', 'versions', 'exports', 'animate', 'ai-editor', 'settings'].includes(activeTab) && "bg-muted text-foreground"
                   )}>
                     <Settings2 className="w-3.5 h-3.5" />
                     More
@@ -521,6 +602,14 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                     {projectVersions.versions.length > 0 && (
                       <span className="ml-auto px-1 py-0.5 text-[10px] bg-primary/20 text-primary rounded">
                         {projectVersions.versions.length}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('exports')} className="gap-2 text-xs">
+                    <Share2 className="w-3.5 h-3.5" /> Exports
+                    {projectExports.exports.length > 0 && (
+                      <span className="ml-auto px-1 py-0.5 text-[10px] bg-primary/20 text-primary rounded">
+                        {projectExports.exports.length}
                       </span>
                     )}
                   </DropdownMenuItem>
@@ -758,6 +847,16 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                 onRestore={handleRestoreVersion}
                 onRename={projectVersions.renameVersion}
                 onDelete={projectVersions.deleteVersion}
+              />
+            </TabsContent>
+
+            <TabsContent value="exports" className="flex-1 m-0 min-h-0">
+              <ExportHistoryPanel
+                exports={projectExports.exports}
+                isLoading={projectExports.isLoading}
+                onRestore={handleRestoreExport}
+                onRename={projectExports.renameExport}
+                onDelete={projectExports.deleteExport}
               />
             </TabsContent>
             

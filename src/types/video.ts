@@ -76,6 +76,8 @@ export interface VideoProject {
   status: 'uploading' | 'analyzing' | 'ready' | 'processing' | 'exporting';
   edits: EditAction[];
   captions?: CaptionSettings;
+  /** Playback speed applied to the preview (1 = normal). */
+  playbackRate?: number;
 }
 
 export interface EditActionParameters {

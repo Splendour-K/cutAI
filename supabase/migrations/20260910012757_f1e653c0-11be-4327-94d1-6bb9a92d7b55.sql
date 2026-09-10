@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.set_project_export_version_number() FROM anon, authenticated, PUBLIC;

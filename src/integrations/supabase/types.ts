@@ -76,6 +76,71 @@ export type Database = {
         }
         Relationships: []
       }
+      project_exports: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          file_size_bytes: number | null
+          filename: string | null
+          id: string
+          label: string
+          mime_type: string | null
+          project_id: string
+          public_url: string | null
+          quality: string
+          snapshot: Json
+          storage_bucket: string
+          storage_path: string
+          updated_at: string
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          file_size_bytes?: number | null
+          filename?: string | null
+          id?: string
+          label?: string
+          mime_type?: string | null
+          project_id: string
+          public_url?: string | null
+          quality?: string
+          snapshot?: Json
+          storage_bucket?: string
+          storage_path: string
+          updated_at?: string
+          user_id: string
+          version_number?: number
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          file_size_bytes?: number | null
+          filename?: string | null
+          id?: string
+          label?: string
+          mime_type?: string | null
+          project_id?: string
+          public_url?: string | null
+          quality?: string
+          snapshot?: Json
+          storage_bucket?: string
+          storage_path?: string
+          updated_at?: string
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_exports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_versions: {
         Row: {
           created_at: string
@@ -253,8 +318,10 @@ export type Database = {
           created_at: string
           description: string | null
           duration_seconds: number | null
+          editor_state: Json | null
           id: string
           platform: string
+          playback_rate: number
           status: string
           thumbnail_url: string | null
           title: string
@@ -269,8 +336,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
+          editor_state?: Json | null
           id?: string
           platform?: string
+          playback_rate?: number
           status?: string
           thumbnail_url?: string | null
           title?: string
@@ -285,8 +354,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           duration_seconds?: number | null
+          editor_state?: Json | null
           id?: string
           platform?: string
+          playback_rate?: number
           status?: string
           thumbnail_url?: string | null
           title?: string
