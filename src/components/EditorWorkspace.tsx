@@ -20,7 +20,7 @@ import { useVideoAnalysis } from '@/hooks/useVideoAnalysis';
 import { useEnhancementWorkflow } from '@/hooks/useEnhancementWorkflow';
 import { useAutoEditor } from '@/hooks/useAutoEditor';
 import { useVideoUpload } from '@/hooks/useVideoUpload';
-import { useVideoExport } from '@/hooks/useVideoExport';
+import { useVideoExport, type ExportSettings } from '@/hooks/useVideoExport';
 import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
