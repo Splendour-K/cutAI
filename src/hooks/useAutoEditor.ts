@@ -614,6 +614,17 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     });
   }, []);
 
+  // Load an EDL from a saved version
+  const loadEDL = useCallback((edl: EditDecisionList | null) => {
+    setWorkflow({
+      status: edl ? 'reviewing' : 'idle',
+      progress: edl ? 100 : 0,
+      edl,
+      reviewStep: edl ? 'preview' : 'cuts',
+      hasUnapprovedChanges: false,
+    });
+  }, []);
+
   // Reset workflow
   const resetWorkflow = useCallback(() => {
     setWorkflow({
@@ -667,6 +678,7 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     prevReviewStep,
     applyEdits,
     resetWorkflow,
+    loadEDL,
     getStats,
     createEDLFromSegments,
     excludeTimeRange,

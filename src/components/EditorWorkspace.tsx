@@ -6,6 +6,8 @@ import { VideoPreview } from './VideoPreview';
 import { EditorHeader } from './EditorHeader';
 import { AnalyzingOverlay } from './AnalyzingOverlay';
 import { EditHistory } from './EditHistory';
+import { VersionHistoryPanel } from './VersionHistoryPanel';
+import { useProjectVersions, type ProjectVersion, type ProjectVersionSnapshot } from '@/hooks/useProjectVersions';
 import { CaptionEditorPanel } from './CaptionEditorPanel';
 import { AIEditorPanel } from './AIEditorPanel';
 import { AutoEditorPanel } from './AutoEditorPanel';
@@ -19,7 +21,7 @@ import { useVideoExport } from '@/hooks/useVideoExport';
 import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles, Film, ChevronDown } from 'lucide-react';
+import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles, Film, ChevronDown, Layers } from 'lucide-react';
 import { AnimationWorkflowPanel } from './AnimationWorkflowPanel';
 import { useAnimationWorkflow } from '@/hooks/useAnimationWorkflow';
 import { useBrandPresets } from '@/hooks/useBrandPresets';
@@ -100,6 +102,55 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
 
   // Auto Editor workflow
   const autoEditor = useAutoEditor({ projectId: project.id });
+
+  // Saved versions (cloud)
+  const projectVersions = useProjectVersions(project.id);
+
+  const buildSnapshot = useCallback((): ProjectVersionSnapshot => ({
+    captions: captionSettings,
+    edl: autoEditor.workflow.edl,
+    enhancements: enhancementWorkflow.workflow.enhancements,
+    editedCaptions,
+    aspectRatio: project.aspectRatio,
+    platform: project.platform,
+    title: project.title,
+  }), [captionSettings, autoEditor.workflow.edl, enhancementWorkflow.workflow.enhancements, editedCaptions, project.aspectRatio, project.platform, project.title]);
+
+  const handleSaveVersion = useCallback((label: string) => {
+    projectVersions.saveVersion(buildSnapshot(), label);
+  }, [projectVersions, buildSnapshot]);
+
+  const handleRestoreVersion = useCallback(async (version: ProjectVersion) => {
+    const snap = version.snapshot || ({} as ProjectVersionSnapshot);
+    if (snap.captions) setCaptionSettings(snap.captions);
+    setEditedCaptions(snap.editedCaptions || {});
+    autoEditor.loadEDL(snap.edl ?? null);
+    enhancementWorkflow.loadEnhancements(snap.enhancements || []);
+    setProject((prev) => ({
+      ...prev,
+      aspectRatio: snap.aspectRatio || prev.aspectRatio,
+      platform: snap.platform || prev.platform,
+    }));
+    setIsPreviewingEdits(!!snap.edl);
+    try {
+      await supabase
+        .from('video_projects')
+        .update({
+          caption_settings: (snap.captions ?? null) as never,
+          aspect_ratio: snap.aspectRatio || project.aspectRatio,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', project.id);
+      await supabase.from('edit_history').insert({
+        project_id: project.id,
+        edit_type: 'effect',
+        description: `Reverted to v${version.version_number} — ${version.label}`,
+      });
+    } catch (err) {
+      console.error('Failed to persist restore:', err);
+    }
+    toast.success(`Restored version ${version.version_number}`);
+  }, [autoEditor, enhancementWorkflow, project.id, project.aspectRatio]);
 
   // Auto-enable edit preview when EDL becomes available (both after autonomous completion and review mode)
   useEffect(() => {
@@ -440,7 +491,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                   <button className={cn(
                     "inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium transition-colors",
                     "text-muted-foreground hover:text-foreground hover:bg-muted/50",
-                    ['analysis', 'history', 'animate', 'ai-editor', 'settings'].includes(activeTab) && "bg-muted text-foreground"
+                    ['analysis', 'history', 'versions', 'animate', 'ai-editor', 'settings'].includes(activeTab) && "bg-muted text-foreground"
                   )}>
                     <Settings2 className="w-3.5 h-3.5" />
                     More
@@ -462,6 +513,14 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                     {project.edits.length > 0 && (
                       <span className="ml-auto px-1 py-0.5 text-[10px] bg-primary/20 text-primary rounded">
                         {project.edits.filter(e => e.applied).length}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('versions')} className="gap-2 text-xs">
+                    <Layers className="w-3.5 h-3.5" /> Versions
+                    {projectVersions.versions.length > 0 && (
+                      <span className="ml-auto px-1 py-0.5 text-[10px] bg-primary/20 text-primary rounded">
+                        {projectVersions.versions.length}
                       </span>
                     )}
                   </DropdownMenuItem>
@@ -688,6 +747,18 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
             
             <TabsContent value="history" className="flex-1 m-0 min-h-0 overflow-auto">
               <EditHistory edits={project.edits} onUndo={handleUndoEdit} />
+            </TabsContent>
+
+            <TabsContent value="versions" className="flex-1 m-0 min-h-0">
+              <VersionHistoryPanel
+                versions={projectVersions.versions}
+                isLoading={projectVersions.isLoading}
+                isSaving={projectVersions.isSaving}
+                onSave={handleSaveVersion}
+                onRestore={handleRestoreVersion}
+                onRename={projectVersions.renameVersion}
+                onDelete={projectVersions.deleteVersion}
+              />
             </TabsContent>
             
             <TabsContent value="settings" className="flex-1 m-0 min-h-0 overflow-auto p-4 space-y-6">
