@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { ChatPanel } from './ChatPanel';
@@ -7,6 +7,9 @@ import { EditorHeader } from './EditorHeader';
 import { AnalyzingOverlay } from './AnalyzingOverlay';
 import { EditHistory } from './EditHistory';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
+import { ExportHistoryPanel } from './ExportHistoryPanel';
+import { useProjectExports, type ProjectExport } from '@/hooks/useProjectExports';
+import { useEditorAutosave, loadEditorState, type EditorState } from '@/hooks/useEditorAutosave';
 import { useProjectVersions, type ProjectVersion, type ProjectVersionSnapshot } from '@/hooks/useProjectVersions';
 import { CaptionEditorPanel } from './CaptionEditorPanel';
 import { AIEditorPanel } from './AIEditorPanel';
@@ -167,25 +170,58 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
   const { deleteProject } = useVideoUpload();
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Auto-save every 2 minutes (includes caption settings)
-  const autoSaveRef = useRef<ReturnType<typeof setInterval>>();
-  const captionSettingsRef = useRef(captionSettings);
-  captionSettingsRef.current = captionSettings;
+  // Saved exports (cloud, shareable)
+  const projectExports = useProjectExports(project.id);
+  const [lastShareUrl, setLastShareUrl] = useState<string | null>(null);
+
+  // --- Continuous cloud autosave of the working editor state ---
+  const [isHydrated, setIsHydrated] = useState(false);
+
   useEffect(() => {
-    autoSaveRef.current = setInterval(async () => {
-      try {
-        await supabase
-          .from('video_projects')
-          .update({
-            updated_at: new Date().toISOString(),
-            status: 'in_progress',
-            caption_settings: captionSettingsRef.current as any,
-          })
-          .eq('id', project.id);
-      } catch {}
-    }, 120_000);
-    return () => clearInterval(autoSaveRef.current);
+    let cancelled = false;
+    loadEditorState(project.id).then((state) => {
+      if (cancelled) {
+        return;
+      }
+      if (state) {
+        if (state.captions) setCaptionSettings(state.captions);
+        setEditedCaptions(state.editedCaptions || {});
+        if (state.edl) {
+          autoEditor.loadEDL(state.edl);
+          setIsPreviewingEdits(true);
+        }
+        if (state.enhancements?.length) enhancementWorkflow.loadEnhancements(state.enhancements);
+        setProject((prev) => ({
+          ...prev,
+          playbackRate: state.playbackRate ?? 1,
+          aspectRatio: state.aspectRatio || prev.aspectRatio,
+        }));
+      }
+      setIsHydrated(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id]);
+
+  const editorState = useMemo<EditorState>(() => ({
+    edl: autoEditor.workflow.edl,
+    enhancements: enhancementWorkflow.workflow.enhancements,
+    editedCaptions,
+    captions: captionSettings,
+    playbackRate: project.playbackRate ?? 1,
+    aspectRatio: project.aspectRatio,
+  }), [
+    autoEditor.workflow.edl,
+    enhancementWorkflow.workflow.enhancements,
+    editedCaptions,
+    captionSettings,
+    project.playbackRate,
+    project.aspectRatio,
+  ]);
+
+  const { saveState, lastSavedAt } = useEditorAutosave(project.id, editorState, isHydrated);
 
   // Load edit history on mount
   useEffect(() => {
