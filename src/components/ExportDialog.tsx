@@ -74,12 +74,12 @@ export function ExportDialog({
   shareUrl,
 }: ExportDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('video');
-  const [selectedQuality, setSelectedQuality] = useState<ExportQuality>('standard');
+  const [settings, setSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
   const [copied, setCopied] = useState(false);
 
   const handleExport = () => {
     if (selectedFormat === 'video') {
-      onExportVideo(selectedQuality);
+      onExportVideo(settings);
     } else {
       onExportEDL(selectedFormat as 'edl' | 'json' | 'premiere' | 'fcpxml');
     }
