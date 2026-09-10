@@ -11,7 +11,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import type { RenderProgress } from '@/hooks/useVideoExport';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DEFAULT_EXPORT_SETTINGS, type ExportResolution, type ExportSettings, type RenderProgress } from '@/hooks/useVideoExport';
 
 type ExportFormat = 'video' | 'edl' | 'json' | 'premiere' | 'fcpxml';
 type ExportQuality = 'draft' | 'standard' | 'high';
@@ -19,7 +20,7 @@ type ExportQuality = 'draft' | 'standard' | 'high';
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onExportVideo: (quality: ExportQuality) => void;
+  onExportVideo: (settings: ExportSettings) => void;
   onExportEDL: (format: 'edl' | 'json' | 'premiere' | 'fcpxml') => void;
   isExporting: boolean;
   renderProgress: RenderProgress | null;
