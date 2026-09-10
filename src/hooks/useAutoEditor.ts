@@ -678,6 +678,7 @@ export function useAutoEditor({ projectId }: UseAutoEditorProps) {
     prevReviewStep,
     applyEdits,
     resetWorkflow,
+    loadEDL,
     getStats,
     createEDLFromSegments,
     excludeTimeRange,
