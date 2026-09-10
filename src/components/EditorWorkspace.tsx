@@ -516,6 +516,14 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
                       </span>
                     )}
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('versions')} className="gap-2 text-xs">
+                    <Layers className="w-3.5 h-3.5" /> Versions
+                    {projectVersions.versions.length > 0 && (
+                      <span className="ml-auto px-1 py-0.5 text-[10px] bg-primary/20 text-primary rounded">
+                        {projectVersions.versions.length}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActiveTab('settings')} className="gap-2 text-xs">
                     <Settings2 className="w-3.5 h-3.5" /> Format
                   </DropdownMenuItem>
