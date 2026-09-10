@@ -438,18 +438,47 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     setShowExportDialog(true);
   }, []);
 
-  const handleExportVideo = useCallback((quality: 'draft' | 'standard' | 'high') => {
-    if (!project.videoUrl || !autoEditor.workflow.edl) {
+  const handleExportVideo = useCallback(async (quality: 'draft' | 'standard' | 'high') => {
+    const edl = autoEditor.workflow.edl;
+    if (!project.videoUrl || !edl) {
       toast.error('No edited video to export. Run the auto-editor or make chat edits first.');
       return;
     }
-    downloadRenderedVideo(
-      autoEditor.workflow.edl,
+    setLastShareUrl(null);
+    const persisted = await downloadRenderedVideo(
+      edl,
       project.videoUrl,
       `${project.title.replace(/\s+/g, '_')}_edited.webm`,
       { quality, projectId: project.id }
     );
-  }, [project.videoUrl, project.title, autoEditor.workflow.edl, downloadRenderedVideo]);
+    if (persisted) {
+      setLastShareUrl(persisted.publicUrl);
+      await projectExports.recordExport({
+        ...persisted,
+        quality,
+        durationSeconds: edl.editedDuration ?? null,
+        label: `${project.title} · ${quality}`,
+        snapshot: buildSnapshot(),
+      });
+      toast.success('Export saved to the cloud — share link ready');
+    }
+  }, [project.videoUrl, project.title, project.id, autoEditor.workflow.edl, downloadRenderedVideo, projectExports, buildSnapshot]);
+
+  const handleRestoreExport = useCallback((exp: ProjectExport) => {
+    if (!exp.snapshot) {
+      toast.error('This export has no saved edit settings');
+      return;
+    }
+    handleRestoreVersion({
+      id: exp.id,
+      project_id: exp.project_id,
+      version_number: exp.version_number,
+      label: exp.label,
+      note: null,
+      snapshot: exp.snapshot,
+      created_at: exp.created_at,
+    });
+  }, [handleRestoreVersion]);
 
   const handleExportEDL = useCallback((format: 'edl' | 'json' | 'premiere' | 'fcpxml') => {
     if (!autoEditor.workflow.edl) {
@@ -493,6 +522,7 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
         renderProgress={renderProgress}
         hasEDL={!!autoEditor.workflow.edl}
         hasVideo={!!project.videoUrl}
+        shareUrl={lastShareUrl}
       />
 
       <EditorHeader project={project} onBack={onBack} onExport={handleExport} onDelete={handleDelete} isDeleting={isDeleting} />
