@@ -25,6 +25,16 @@ export function useEnhancementWorkflow({ projectId }: UseEnhancementWorkflowProp
     setWorkflow(prev => ({ ...prev, ...updates }));
   }, []);
 
+  // Load enhancements from a saved version
+  const loadEnhancements = useCallback((enhancements: Enhancement[]) => {
+    setWorkflow(prev => ({
+      ...prev,
+      status: enhancements.length > 0 ? 'reviewing' : 'idle',
+      progress: enhancements.length > 0 ? 100 : 0,
+      enhancements,
+    }));
+  }, []);
+
   // Analyze video for enhancement opportunities
   const analyzeForEnhancements = useCallback(async (
     transcript: { fullText: string; segments: TranscriptSegment[] },
@@ -291,5 +301,6 @@ export function useEnhancementWorkflow({ projectId }: UseEnhancementWorkflowProp
     repositionEnhancement,
     retimeEnhancement,
     resetWorkflow,
+    loadEnhancements,
   };
 }
