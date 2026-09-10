@@ -93,6 +93,14 @@ export function VideoPreview({
 
   const platformConfig = PLATFORM_CONFIGS[project.platform];
 
+  // Apply the project's playback speed (set via chat or restored from the cloud)
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = project.playbackRate ?? 1;
+    }
+  }, [project.playbackRate, project.videoUrl]);
+
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;

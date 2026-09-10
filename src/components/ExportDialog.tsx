@@ -52,9 +52,11 @@ export function ExportDialog({
   renderProgress,
   hasEDL,
   hasVideo,
+  shareUrl,
 }: ExportDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('video');
   const [selectedQuality, setSelectedQuality] = useState<ExportQuality>('standard');
+  const [copied, setCopied] = useState(false);
 
   const handleExport = () => {
     if (selectedFormat === 'video') {
