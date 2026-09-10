@@ -11,7 +11,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import type { RenderProgress } from '@/hooks/useVideoExport';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DEFAULT_EXPORT_SETTINGS, type ExportResolution, type ExportSettings, type RenderProgress } from '@/hooks/useVideoExport';
 
 type ExportFormat = 'video' | 'edl' | 'json' | 'premiere' | 'fcpxml';
 type ExportQuality = 'draft' | 'standard' | 'high';
@@ -19,7 +20,7 @@ type ExportQuality = 'draft' | 'standard' | 'high';
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onExportVideo: (quality: ExportQuality) => void;
+  onExportVideo: (settings: ExportSettings) => void;
   onExportEDL: (format: 'edl' | 'json' | 'premiere' | 'fcpxml') => void;
   isExporting: boolean;
   renderProgress: RenderProgress | null;
@@ -37,10 +38,28 @@ const FORMAT_OPTIONS: { id: ExportFormat; label: string; description: string; ic
   { id: 'fcpxml', label: 'FCPXML', description: 'Final Cut Pro X project file', icon: <FileText className="w-5 h-5" />, group: 'file' },
 ];
 
-const QUALITY_OPTIONS: { id: ExportQuality; label: string; description: string }[] = [
-  { id: 'draft', label: 'Draft', description: '50% resolution, fast' },
-  { id: 'standard', label: 'Standard', description: '75% resolution, balanced' },
-  { id: 'high', label: 'High', description: 'Full resolution, slower' },
+const RESOLUTION_OPTIONS: { id: ExportResolution; label: string }[] = [
+  { id: 'source', label: 'Same as original' },
+  { id: '2160p', label: '4K · 2160p' },
+  { id: '1440p', label: 'QHD · 1440p' },
+  { id: '1080p', label: 'Full HD · 1080p' },
+  { id: '720p', label: 'HD · 720p' },
+  { id: '480p', label: 'Small · 480p' },
+];
+
+const VIDEO_BITRATE_OPTIONS: { value: number; label: string }[] = [
+  { value: 2_000_000, label: 'Light · 2 Mbps (smallest file)' },
+  { value: 4_000_000, label: 'Balanced · 4 Mbps' },
+  { value: 8_000_000, label: 'Sharp · 8 Mbps' },
+  { value: 16_000_000, label: 'Very sharp · 16 Mbps' },
+  { value: 30_000_000, label: 'Maximum · 30 Mbps (largest file)' },
+];
+
+const AUDIO_BITRATE_OPTIONS: { value: number; label: string }[] = [
+  { value: 96_000, label: 'Voice · 96 kbps' },
+  { value: 128_000, label: 'Standard · 128 kbps' },
+  { value: 192_000, label: 'High · 192 kbps' },
+  { value: 256_000, label: 'Studio · 256 kbps' },
 ];
 
 export function ExportDialog({
@@ -55,12 +74,12 @@ export function ExportDialog({
   shareUrl,
 }: ExportDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<ExportFormat>('video');
-  const [selectedQuality, setSelectedQuality] = useState<ExportQuality>('standard');
+  const [settings, setSettings] = useState<ExportSettings>(DEFAULT_EXPORT_SETTINGS);
   const [copied, setCopied] = useState(false);
 
   const handleExport = () => {
     if (selectedFormat === 'video') {
-      onExportVideo(selectedQuality);
+      onExportVideo(settings);
     } else {
       onExportEDL(selectedFormat as 'edl' | 'json' | 'premiere' | 'fcpxml');
     }
@@ -196,27 +215,59 @@ export function ExportDialog({
               ))}
             </div>
 
-            {/* Quality selector (only for video) */}
+            {/* Quality settings (only for video) */}
             {selectedFormat === 'video' && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quality</p>
-                <div className="flex gap-2">
-                  {QUALITY_OPTIONS.map((q) => (
-                    <button
-                      key={q.id}
-                      onClick={() => setSelectedQuality(q.id)}
-                      className={cn(
-                        'flex-1 p-2 rounded-lg border text-center transition-colors',
-                        selectedQuality === q.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-muted-foreground/30'
-                      )}
-                    >
-                      <p className="text-sm font-medium text-foreground">{q.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{q.description}</p>
-                    </button>
-                  ))}
+
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Picture size</label>
+                  <Select
+                    value={settings.resolution}
+                    onValueChange={(v) => setSettings((s) => ({ ...s, resolution: v as ExportResolution }))}
+                  >
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {RESOLUTION_OPTIONS.map((r) => (
+                        <SelectItem key={r.id} value={r.id} className="text-sm">{r.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Picture quality</label>
+                  <Select
+                    value={String(settings.videoBitrate)}
+                    onValueChange={(v) => setSettings((s) => ({ ...s, videoBitrate: Number(v) }))}
+                  >
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {VIDEO_BITRATE_OPTIONS.map((b) => (
+                        <SelectItem key={b.value} value={String(b.value)} className="text-sm">{b.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Sound quality</label>
+                  <Select
+                    value={String(settings.audioBitrate)}
+                    onValueChange={(v) => setSettings((s) => ({ ...s, audioBitrate: Number(v) }))}
+                  >
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {AUDIO_BITRATE_OPTIONS.map((a) => (
+                        <SelectItem key={a.value} value={String(a.value)} className="text-sm">{a.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  Bigger sizes and higher quality take longer to render and make a larger file.
+                </p>
               </div>
             )}
 

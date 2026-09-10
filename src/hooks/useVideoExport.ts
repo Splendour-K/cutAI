@@ -2,6 +2,8 @@ import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { EditDecisionList, BRollSuggestion } from '@/types/autoEditor';
+import type { CaptionSettings } from '@/types/video';
+import type { TranscriptSegment } from '@/hooks/useVideoAnalysis';
 
 export interface RenderProgress {
   stage: 'preparing' | 'rendering' | 'encoding' | 'complete' | 'error';
@@ -17,10 +19,44 @@ export interface PersistedExport {
   fileSizeBytes: number;
 }
 
-interface ExportOptions {
-  format: 'edl' | 'json' | 'premiere' | 'fcpxml' | 'video';
-  quality: 'draft' | 'standard' | 'high';
+export type ExportResolution = 'source' | '2160p' | '1440p' | '1080p' | '720p' | '480p';
+
+/** User-facing render settings from the export dialog. */
+export interface ExportSettings {
+  resolution: ExportResolution;
+  /** Video bitrate in bits per second. */
+  videoBitrate: number;
+  /** Audio bitrate in bits per second. */
+  audioBitrate: number;
+  fps?: number;
 }
+
+export interface RenderContext {
+  projectId?: string;
+  settings: ExportSettings;
+  /** Playback speed baked into the render (1 = normal). */
+  playbackRate?: number;
+  captions?: {
+    settings: CaptionSettings;
+    segments: TranscriptSegment[] | null;
+    editedCaptions?: Record<number, string>;
+  };
+}
+
+export const RESOLUTION_HEIGHTS: Record<Exclude<ExportResolution, 'source'>, number> = {
+  '2160p': 2160,
+  '1440p': 1440,
+  '1080p': 1080,
+  '720p': 720,
+  '480p': 480,
+};
+
+export const DEFAULT_EXPORT_SETTINGS: ExportSettings = {
+  resolution: '1080p',
+  videoBitrate: 8_000_000,
+  audioBitrate: 128_000,
+  fps: 30,
+};
 
 // Audio ducking config for export
 const DUCK_VOLUME = 0.15;
@@ -41,7 +77,7 @@ export function useVideoExport() {
     videoUrl?: string
   ) => {
     setIsExporting(true);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke('export-video', {
         body: {
@@ -76,69 +112,108 @@ export function useVideoExport() {
     }
   }, []);
 
-  // Render video with effects AND audio using Canvas + Web Audio API
+  /**
+   * Render the full edited video: included A-roll segments in order, zooms,
+   * B-roll overlays, burned-in captions, playback speed and audio ducking.
+   */
   const renderVideoWithEffects = useCallback(async (
     edl: EditDecisionList,
     sourceVideoUrl: string,
-    options: { quality: 'draft' | 'standard' | 'high'; projectId?: string } = { quality: 'standard' }
+    context: RenderContext
   ): Promise<Blob | null> => {
+    const settings = context.settings ?? DEFAULT_EXPORT_SETTINGS;
+    const fps = settings.fps ?? 30;
+    const speed = Math.max(0.25, Math.min(4, context.playbackRate ?? 1));
+
     setIsExporting(true);
     setRenderProgress({ stage: 'preparing', progress: 0, message: 'Preparing video & audio...' });
 
+    let audioCtx: AudioContext | null = null;
+    const bRollEls: HTMLVideoElement[] = [];
+
     try {
-      // Create video element for source
       const video = document.createElement('video');
       video.src = sourceVideoUrl;
       video.crossOrigin = 'anonymous';
-      video.muted = false; // Keep audio enabled for capture
+      video.muted = false;
       video.volume = 1;
+      video.playbackRate = speed;
       videoRef.current = video;
 
       await new Promise<void>((resolve, reject) => {
         video.onloadedmetadata = () => resolve();
-        video.onerror = () => reject(new Error('Failed to load video'));
+        video.onerror = () => reject(new Error('Could not open the source video'));
       });
 
-      // Set up Web Audio context for audio processing
-      const audioCtx = new AudioContext();
+      // Web Audio graph (ducking + crossfades)
+      audioCtx = new AudioContext();
       const sourceNode = audioCtx.createMediaElementSource(video);
       const gainNode = audioCtx.createGain();
       gainNode.gain.value = 1.0;
       const audioDest = audioCtx.createMediaStreamDestination();
       sourceNode.connect(gainNode);
       gainNode.connect(audioDest);
-      // Also connect to speakers so video.play() works properly
       gainNode.connect(audioCtx.destination);
 
-      // Create canvas for rendering
+      // Output canvas sized from the chosen resolution
       const canvas = document.createElement('canvas');
-      const qualityMultiplier = options.quality === 'high' ? 1 : options.quality === 'standard' ? 0.75 : 0.5;
-      canvas.width = video.videoWidth * qualityMultiplier;
-      canvas.height = video.videoHeight * qualityMultiplier;
+      const srcW = video.videoWidth || 1280;
+      const srcH = video.videoHeight || 720;
+      const targetH = settings.resolution === 'source'
+        ? srcH
+        : Math.min(srcH * 2, RESOLUTION_HEIGHTS[settings.resolution]);
+      const scale = targetH / srcH;
+      canvas.width = Math.max(2, Math.round((srcW * scale) / 2) * 2);
+      canvas.height = Math.max(2, Math.round(targetH / 2) * 2);
       canvasRef.current = canvas;
       const ctx = canvas.getContext('2d')!;
 
-      // Get included segments
       const segments = edl.aRollSegments
         .filter(s => s.isIncluded)
         .sort((a, b) => a.newStartTime - b.newStartTime);
 
-      // Get enabled zooms and approved B-roll
+      if (segments.length === 0) {
+        throw new Error('There are no clips left to render');
+      }
+
       const zooms = edl.zoomEffects.filter(z => z.isEnabled);
       const approvedBRoll = edl.bRollSuggestions.filter(
         b => (b.status === 'approved' || b.status === 'ready') && b.stockFootageUrl
       );
 
-      // Combine video canvas stream + audio stream
-      const videoStream = canvas.captureStream(30);
+      // Preload B-roll clips so they can be composited during the render
+      setRenderProgress({ stage: 'preparing', progress: 5, message: 'Loading stock footage...' });
+      const bRollMap = new Map<string, HTMLVideoElement>();
+      await Promise.all(approvedBRoll.map(async (b) => {
+        try {
+          const el = document.createElement('video');
+          el.src = b.stockFootageUrl!;
+          el.crossOrigin = 'anonymous';
+          el.muted = true;
+          el.playbackRate = speed;
+          await new Promise<void>((resolve, reject) => {
+            el.onloadeddata = () => resolve();
+            el.onerror = () => reject(new Error('broll load failed'));
+            setTimeout(() => reject(new Error('broll timeout')), 12000);
+          });
+          bRollEls.push(el);
+          bRollMap.set(b.id, el);
+        } catch {
+          // A missing stock clip must not fail the whole export
+        }
+      }));
+
+      const videoStream = canvas.captureStream(fps);
       const combinedStream = new MediaStream([
         ...videoStream.getVideoTracks(),
         ...audioDest.stream.getAudioTracks(),
       ]);
 
+      const mimeType = pickMimeType();
       const mediaRecorder = new MediaRecorder(combinedStream, {
-        mimeType: 'video/webm;codecs=vp9,opus',
-        videoBitsPerSecond: options.quality === 'high' ? 8000000 : options.quality === 'standard' ? 4000000 : 2000000,
+        ...(mimeType ? { mimeType } : {}),
+        videoBitsPerSecond: settings.videoBitrate,
+        audioBitsPerSecond: settings.audioBitrate,
       });
 
       const chunks: Blob[] = [];
@@ -148,74 +223,58 @@ export function useVideoExport() {
 
       const renderComplete = new Promise<Blob>((resolve) => {
         mediaRecorder.onstop = () => {
-          const blob = new Blob(chunks, { type: 'video/webm' });
-          resolve(blob);
+          resolve(new Blob(chunks, { type: mimeType?.split(';')[0] || 'video/webm' }));
         };
       });
 
-      mediaRecorder.start(100); // Collect data every 100ms
-      setRenderProgress({ stage: 'rendering', progress: 10, message: 'Rendering segments with audio...' });
+      mediaRecorder.start(200);
+      setRenderProgress({ stage: 'rendering', progress: 10, message: 'Rendering your edit...' });
 
-      // Process each segment by playing the video in real-time sections
+      const totalSourceDuration = segments.reduce((sum, s) => sum + s.duration, 0) || 1;
+      let renderedSourceSeconds = 0;
+
       for (let segIndex = 0; segIndex < segments.length; segIndex++) {
         const segment = segments[segIndex];
-        const segmentProgress = ((segIndex + 1) / segments.length) * 80;
 
-        setRenderProgress({
-          stage: 'rendering',
-          progress: 10 + segmentProgress * 0.5,
-          message: `Rendering segment ${segIndex + 1}/${segments.length}...`,
-        });
-
-        // Seek to segment start
         video.currentTime = segment.originalStartTime;
         await waitForSeek(video);
 
-        // Schedule audio ducking for B-roll overlaps within this segment
-        scheduleDuckingForSegment(
-          gainNode, audioCtx, segment, approvedBRoll,
-          segment.originalStartTime
-        );
+        scheduleDuckingForSegment(gainNode, audioCtx, segment, approvedBRoll, speed);
 
-        // Schedule crossfade: fade in at segment start, fade out at segment end
         const isFirstSegment = segIndex === 0;
         const isLastSegment = segIndex === segments.length - 1;
         const segNow = audioCtx.currentTime;
+        const wallDuration = segment.duration / speed;
 
         if (!isFirstSegment) {
-          // Fade in from silence to avoid pop at cut point
           gainNode.gain.setValueAtTime(0.01, segNow);
           gainNode.gain.exponentialRampToValueAtTime(1.0, segNow + CROSSFADE_SECONDS);
         }
-
-        // Play segment in real-time to capture audio
-        const segmentDuration = segment.duration;
-
-        if (!isLastSegment && segmentDuration > CROSSFADE_SECONDS) {
-          // Schedule fade out near end of segment
-          const fadeOutTime = segNow + segmentDuration - CROSSFADE_SECONDS;
+        if (!isLastSegment && wallDuration > CROSSFADE_SECONDS) {
+          const fadeOutTime = segNow + wallDuration - CROSSFADE_SECONDS;
           gainNode.gain.setValueAtTime(1.0, fadeOutTime);
           gainNode.gain.exponentialRampToValueAtTime(0.01, fadeOutTime + CROSSFADE_SECONDS);
         }
 
-        video.play();
+        await video.play();
 
         const startWallTime = performance.now();
-        const fps = 30;
         const frameDuration = 1000 / fps;
         let lastFrameTime = 0;
+        const playingBRoll = new Set<string>();
 
-        // Render loop: draw frames while audio plays naturally
         await new Promise<void>((resolve) => {
           const renderFrame = () => {
-            const elapsed = (performance.now() - startWallTime) / 1000;
-            const currentVideoTime = segment.originalStartTime + elapsed;
+            const wallElapsed = (performance.now() - startWallTime) / 1000;
+            const sourceElapsed = wallElapsed * speed;
+            const currentVideoTime = segment.originalStartTime + sourceElapsed;
 
-            if (elapsed >= segmentDuration) {
+            if (wallElapsed >= wallDuration) {
               video.pause();
-              // Reset gain for next segment
-              gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
-              gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
+              for (const id of playingBRoll) bRollMap.get(id)?.pause();
+              gainNode.gain.cancelScheduledValues(audioCtx!.currentTime);
+              gainNode.gain.setValueAtTime(1.0, audioCtx!.currentTime);
+              renderedSourceSeconds += segment.duration;
               resolve();
               return;
             }
@@ -223,25 +282,24 @@ export function useVideoExport() {
             const now = performance.now();
             if (now - lastFrameTime >= frameDuration) {
               lastFrameTime = now;
-
               ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-              // Check for active zoom
               const activeZoom = zooms.find(z =>
                 currentVideoTime >= z.startTime && currentVideoTime <= z.endTime
               );
 
               if (activeZoom) {
-                const progress = (currentVideoTime - activeZoom.startTime) / activeZoom.duration;
-                const easedProgress = applyEasing(progress, activeZoom.easing);
-                const scale = activeZoom.startScale + (activeZoom.endScale - activeZoom.startScale) * easedProgress;
-
+                const progress = activeZoom.duration > 0
+                  ? (currentVideoTime - activeZoom.startTime) / activeZoom.duration
+                  : 1;
+                const eased = applyEasing(progress, activeZoom.easing);
+                const zoomScale = activeZoom.startScale + (activeZoom.endScale - activeZoom.startScale) * eased;
                 const centerX = (activeZoom.focalPoint.x / 100) * canvas.width;
                 const centerY = (activeZoom.focalPoint.y / 100) * canvas.height;
 
                 ctx.save();
                 ctx.translate(centerX, centerY);
-                ctx.scale(scale, scale);
+                ctx.scale(zoomScale, zoomScale);
                 ctx.translate(-centerX, -centerY);
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 ctx.restore();
@@ -249,8 +307,29 @@ export function useVideoExport() {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               }
 
-              // Draw B-roll overlay if active
-              // (B-roll video elements would be composited here in a full implementation)
+              // Composite active B-roll on top of the A-roll frame
+              const activeBRoll = approvedBRoll.find(b =>
+                currentVideoTime >= b.timestamp && currentVideoTime <= b.timestamp + b.duration
+              );
+              if (activeBRoll) {
+                const el = bRollMap.get(activeBRoll.id);
+                if (el) {
+                  if (!playingBRoll.has(activeBRoll.id)) {
+                    playingBRoll.add(activeBRoll.id);
+                    el.currentTime = 0;
+                    el.play().catch(() => undefined);
+                  }
+                  drawBRollFrame(ctx, canvas, el, activeBRoll);
+                }
+              } else if (playingBRoll.size) {
+                for (const id of playingBRoll) bRollMap.get(id)?.pause();
+                playingBRoll.clear();
+              }
+
+              // Burn in captions
+              if (context.captions?.settings?.enabled) {
+                drawCaption(ctx, canvas, currentVideoTime, context.captions);
+              }
             }
 
             requestAnimationFrame(renderFrame);
@@ -259,20 +338,23 @@ export function useVideoExport() {
           requestAnimationFrame(renderFrame);
         });
 
-        // Brief pause between segments for clean transitions
+        setRenderProgress({
+          stage: 'rendering',
+          progress: 10 + Math.round((renderedSourceSeconds / totalSourceDuration) * 82),
+          message: `Rendering clip ${segIndex + 1} of ${segments.length}...`,
+        });
+
         await new Promise(resolve => setTimeout(resolve, 50));
       }
 
-      setRenderProgress({ stage: 'encoding', progress: 95, message: 'Finalizing audio & video...' });
+      setRenderProgress({ stage: 'encoding', progress: 94, message: 'Finalizing audio & video...' });
 
       mediaRecorder.stop();
       const blob = await renderComplete;
 
-      // Clean up audio context
-      await audioCtx.close();
+      if (!blob.size) throw new Error('The render produced an empty file');
 
       setRenderProgress({ stage: 'complete', progress: 100, message: 'Export complete!' });
-
       return blob;
     } catch (error) {
       console.error('Render error:', error);
@@ -283,6 +365,11 @@ export function useVideoExport() {
       });
       return null;
     } finally {
+      for (const el of bRollEls) {
+        el.pause();
+        el.src = '';
+      }
+      if (audioCtx && audioCtx.state !== 'closed') await audioCtx.close();
       setIsExporting(false);
     }
   }, []);
@@ -319,7 +406,7 @@ export function useVideoExport() {
 
       const { error: uploadError } = await supabase.storage
         .from('videos')
-        .upload(storagePath, blob, { cacheControl: '3600', upsert: false });
+        .upload(storagePath, blob, { cacheControl: '3600', upsert: false, contentType: blob.type || 'video/webm' });
 
       if (uploadError) {
         console.error('Export upload failed:', uploadError);
@@ -356,9 +443,9 @@ export function useVideoExport() {
     edl: EditDecisionList,
     sourceVideoUrl: string,
     filename: string = 'edited-video.webm',
-    options?: { quality: 'draft' | 'standard' | 'high'; projectId?: string }
+    context: RenderContext
   ): Promise<PersistedExport | null> => {
-    const blob = await renderVideoWithEffects(edl, sourceVideoUrl, options);
+    const blob = await renderVideoWithEffects(edl, sourceVideoUrl, context);
     if (!blob) return null;
 
     const url = URL.createObjectURL(blob);
@@ -372,7 +459,7 @@ export function useVideoExport() {
 
     toast.success('Video exported successfully!');
 
-    const projectId = options?.projectId || edl.projectId;
+    const projectId = context.projectId || edl.projectId;
     if (!projectId) return null;
 
     setRenderProgress({ stage: 'encoding', progress: 97, message: 'Uploading to the cloud...' });
@@ -397,6 +484,17 @@ export function useVideoExport() {
 
 // --- Helper functions ---
 
+function pickMimeType(): string | undefined {
+  const candidates = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+    'video/mp4',
+  ];
+  if (typeof MediaRecorder === 'undefined') return undefined;
+  return candidates.find(t => MediaRecorder.isTypeSupported(t));
+}
+
 function waitForSeek(video: HTMLVideoElement): Promise<void> {
   return new Promise((resolve) => {
     const handler = () => {
@@ -405,6 +503,136 @@ function waitForSeek(video: HTMLVideoElement): Promise<void> {
     };
     video.addEventListener('seeked', handler);
   });
+}
+
+/** Draw a B-roll frame, either full-frame or as an inset overlay. */
+function drawBRollFrame(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  el: HTMLVideoElement,
+  broll: BRollSuggestion
+) {
+  const inset = broll.type === 'overlay' || broll.type === 'split-screen';
+  if (!inset) {
+    ctx.drawImage(el, 0, 0, canvas.width, canvas.height);
+    return;
+  }
+  const w = canvas.width * 0.42;
+  const h = w * ((el.videoHeight || 9) / (el.videoWidth || 16));
+  const x = canvas.width - w - canvas.width * 0.04;
+  const y = canvas.height * 0.04;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = canvas.width * 0.01;
+  ctx.drawImage(el, x, y, w, h);
+  ctx.restore();
+}
+
+/** Burn the active caption into the frame using the project's caption settings. */
+function drawCaption(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  time: number,
+  captions: NonNullable<RenderContext['captions']>
+) {
+  const { segments, settings, editedCaptions = {} } = captions;
+  if (!segments?.length) return;
+
+  const index = segments.findIndex(s => time >= s.startTime && time <= s.endTime);
+  if (index === -1) return;
+  const text = (editedCaptions[index] ?? segments[index].text ?? '').trim();
+  if (!text) return;
+
+  const sizeFactor = settings.fontSize === 'small' ? 0.035
+    : settings.fontSize === 'large' ? 0.06
+    : settings.fontSize === 'xlarge' ? 0.075
+    : 0.048;
+  const fontSize = Math.round(canvas.height * sizeFactor);
+  const bold = settings.style === 'bold' || settings.style === 'hormozi';
+  ctx.font = `${bold ? '800' : '600'} ${fontSize}px ${settings.fontFamily || 'Inter'}, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const maxWidth = canvas.width * 0.86;
+  const lines = wrapText(ctx, text.toUpperCase() === text && bold ? text : text, maxWidth);
+  const lineHeight = fontSize * 1.25;
+  const blockHeight = lines.length * lineHeight;
+
+  let centerY: number;
+  if (settings.customPosition) {
+    centerY = (settings.customPosition.y / 100) * canvas.height;
+  } else if (settings.position === 'top') {
+    centerY = canvas.height * 0.12 + blockHeight / 2;
+  } else if (settings.position === 'center') {
+    centerY = canvas.height / 2;
+  } else {
+    centerY = canvas.height * 0.86 - blockHeight / 2;
+  }
+  const centerX = settings.customPosition
+    ? (settings.customPosition.x / 100) * canvas.width
+    : canvas.width / 2;
+
+  const padX = fontSize * 0.6;
+  const padY = fontSize * 0.35;
+  const widest = Math.max(...lines.map(l => ctx.measureText(l).width));
+
+  if (settings.backgroundColor && settings.backgroundColor !== 'transparent') {
+    ctx.fillStyle = settings.backgroundColor;
+    const boxW = widest + padX * 2;
+    const boxH = blockHeight + padY * 2;
+    const r = fontSize * 0.3;
+    roundRect(ctx, centerX - boxW / 2, centerY - boxH / 2, boxW, boxH, r);
+    ctx.fill();
+  } else if (settings.style === 'modern' || settings.style === 'subtitle') {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    const boxW = widest + padX * 2;
+    const boxH = blockHeight + padY * 2;
+    roundRect(ctx, centerX - boxW / 2, centerY - boxH / 2, boxW, boxH, fontSize * 0.3);
+    ctx.fill();
+  }
+
+  const strokeWidth = settings.strokeWidth ?? (settings.style === 'minimal' || bold ? 4 : 0);
+  lines.forEach((line, i) => {
+    const y = centerY - blockHeight / 2 + lineHeight * (i + 0.5);
+    if (strokeWidth > 0) {
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = strokeWidth * (fontSize / 40) * 2;
+      ctx.strokeStyle = settings.strokeColor || '#000000';
+      ctx.strokeText(line, centerX, y);
+    }
+    ctx.fillStyle = settings.textColor || settings.brandColor || '#FFFFFF';
+    ctx.fillText(line, centerX, y);
+  });
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (ctx.measureText(candidate).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = candidate;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.slice(0, 3);
+}
+
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 /**
@@ -416,7 +644,7 @@ function scheduleDuckingForSegment(
   audioCtx: AudioContext,
   segment: { originalStartTime: number; originalEndTime: number },
   bRollItems: BRollSuggestion[],
-  _segmentStartTime: number
+  speed: number
 ) {
   const now = audioCtx.currentTime;
 
@@ -424,19 +652,16 @@ function scheduleDuckingForSegment(
     const brollStart = broll.timestamp;
     const brollEnd = broll.timestamp + broll.duration;
 
-    // Check if this B-roll overlaps the current segment
     if (brollEnd <= segment.originalStartTime || brollStart >= segment.originalEndTime) {
       continue;
     }
 
-    // Calculate when ducking should happen relative to current audio time
-    const duckStartOffset = Math.max(0, brollStart - segment.originalStartTime);
+    const duckStartOffset = Math.max(0, brollStart - segment.originalStartTime) / speed;
     const duckEndOffset = Math.min(
       segment.originalEndTime - segment.originalStartTime,
       brollEnd - segment.originalStartTime
-    );
+    ) / speed;
 
-    // Fade down at B-roll start
     const fadeDownTime = now + duckStartOffset;
     gainNode.gain.setValueAtTime(1.0, fadeDownTime);
     gainNode.gain.exponentialRampToValueAtTime(
@@ -444,7 +669,6 @@ function scheduleDuckingForSegment(
       fadeDownTime + DUCK_FADE_SECONDS
     );
 
-    // Fade back up at B-roll end
     const fadeUpTime = now + duckEndOffset;
     gainNode.gain.setValueAtTime(DUCK_VOLUME, fadeUpTime);
     gainNode.gain.exponentialRampToValueAtTime(1.0, fadeUpTime + DUCK_FADE_SECONDS);

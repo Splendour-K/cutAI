@@ -20,7 +20,7 @@ import { useVideoAnalysis } from '@/hooks/useVideoAnalysis';
 import { useEnhancementWorkflow } from '@/hooks/useEnhancementWorkflow';
 import { useAutoEditor } from '@/hooks/useAutoEditor';
 import { useVideoUpload } from '@/hooks/useVideoUpload';
-import { useVideoExport } from '@/hooks/useVideoExport';
+import { useVideoExport, type ExportSettings } from '@/hooks/useVideoExport';
 import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -438,31 +438,42 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
     setShowExportDialog(true);
   }, []);
 
-  const handleExportVideo = useCallback(async (quality: 'draft' | 'standard' | 'high') => {
+  const handleExportVideo = useCallback(async (settings: ExportSettings) => {
     const edl = autoEditor.workflow.edl;
     if (!project.videoUrl || !edl) {
       toast.error('No edited video to export. Run the auto-editor or make chat edits first.');
       return;
     }
+    const playbackRate = project.playbackRate ?? 1;
+    const qualityLabel = settings.resolution === 'source' ? 'source' : settings.resolution;
     setLastShareUrl(null);
     const persisted = await downloadRenderedVideo(
       edl,
-      project.videoUrl,
+      project.cloudVideoUrl || project.videoUrl,
       `${project.title.replace(/\s+/g, '_')}_edited.webm`,
-      { quality, projectId: project.id }
+      {
+        projectId: project.id,
+        settings,
+        playbackRate,
+        captions: {
+          settings: captionSettings,
+          segments: analysis?.transcription?.segments ?? null,
+          editedCaptions,
+        },
+      }
     );
     if (persisted) {
       setLastShareUrl(persisted.publicUrl);
       await projectExports.recordExport({
         ...persisted,
-        quality,
-        durationSeconds: edl.editedDuration ?? null,
-        label: `${project.title} · ${quality}`,
+        quality: qualityLabel,
+        durationSeconds: edl.editedDuration ? edl.editedDuration / playbackRate : null,
+        label: `${project.title} · ${qualityLabel} · ${Math.round(settings.videoBitrate / 1_000_000)} Mbps`,
         snapshot: buildSnapshot(),
       });
       toast.success('Export saved to the cloud — share link ready');
     }
-  }, [project.videoUrl, project.title, project.id, autoEditor.workflow.edl, downloadRenderedVideo, projectExports, buildSnapshot]);
+  }, [project.videoUrl, project.cloudVideoUrl, project.title, project.id, project.playbackRate, autoEditor.workflow.edl, downloadRenderedVideo, projectExports, buildSnapshot, captionSettings, editedCaptions, analysis?.transcription?.segments]);
 
   const handleRestoreExport = useCallback((exp: ProjectExport) => {
     if (!exp.snapshot) {
