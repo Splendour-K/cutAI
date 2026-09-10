@@ -24,7 +24,7 @@ import { useVideoExport } from '@/hooks/useVideoExport';
 import type { VideoProject, AspectRatio, CaptionSettings } from '@/types/video';
 import { PLATFORM_CONFIGS } from '@/types/video';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles, Film, ChevronDown, Layers } from 'lucide-react';
+import { MessageSquare, History, Settings2, Brain, Loader2, Captions, Wand2, Sparkles, Film, ChevronDown, Layers, Share2, Check } from 'lucide-react';
 import { AnimationWorkflowPanel } from './AnimationWorkflowPanel';
 import { useAnimationWorkflow } from '@/hooks/useAnimationWorkflow';
 import { useBrandPresets } from '@/hooks/useBrandPresets';
