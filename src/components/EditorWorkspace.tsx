@@ -748,6 +748,18 @@ export function EditorWorkspace({ project: initialProject, onBack }: EditorWorks
             <TabsContent value="history" className="flex-1 m-0 min-h-0 overflow-auto">
               <EditHistory edits={project.edits} onUndo={handleUndoEdit} />
             </TabsContent>
+
+            <TabsContent value="versions" className="flex-1 m-0 min-h-0">
+              <VersionHistoryPanel
+                versions={projectVersions.versions}
+                isLoading={projectVersions.isLoading}
+                isSaving={projectVersions.isSaving}
+                onSave={handleSaveVersion}
+                onRestore={handleRestoreVersion}
+                onRename={projectVersions.renameVersion}
+                onDelete={projectVersions.deleteVersion}
+              />
+            </TabsContent>
             
             <TabsContent value="settings" className="flex-1 m-0 min-h-0 overflow-auto p-4 space-y-6">
               <div>
